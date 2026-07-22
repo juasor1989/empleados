@@ -33,28 +33,50 @@
   .sync-status.error{color:var(--danger);}
 
   /* Gasto por día */
-  .cost-chart{display:flex; align-items:flex-end; gap:6px; height:170px; overflow-x:auto; padding:14px 10px 10px; border:1px solid var(--line); border-radius:8px; background:var(--surface);}
-  .cost-bar-col{display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:32px; height:100%; flex-shrink:0;}
-  .cost-bar-value{font-size:9px; color:var(--muted); margin-bottom:3px; white-space:nowrap; font-family:'IBM Plex Mono',monospace;}
-  .cost-bar{width:16px; background:var(--copper); border-radius:3px 3px 0 0; min-height:2px;}
+  .cost-chart-card{border:1px solid var(--line); border-radius:12px; background:linear-gradient(180deg, var(--surface), var(--bg)); padding:20px 16px 14px; overflow:hidden;}
+  .cost-chart{position:relative; display:flex; align-items:flex-end; gap:10px; height:190px; overflow-x:auto; overflow-y:visible; padding:0 4px 0;}
+  .cost-avg-line{position:absolute; left:0; right:0; border-top:1px dashed rgba(240,224,199,.28); pointer-events:none;}
+  .cost-avg-label{position:absolute; right:2px; font-size:9px; color:var(--muted); background:var(--surface); padding:0 4px; transform:translateY(-100%);}
+  .cost-bar-col{display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:34px; height:100%; flex-shrink:0; position:relative;}
+  .cost-bar-value{font-size:10px; font-weight:600; color:var(--text); margin-bottom:5px; white-space:nowrap; font-family:'IBM Plex Mono',monospace; opacity:.9;}
+  .cost-bar{width:20px; background:linear-gradient(180deg, var(--copper-bright), var(--copper)); border-radius:5px 5px 2px 2px; min-height:3px; transition:transform .15s ease, filter .15s ease; transform-origin:bottom; animation:growBar .5s ease-out;}
+  .cost-bar-col:hover .cost-bar{transform:scaleX(1.15); filter:brightness(1.12);}
   .cost-bar.stacked{display:flex; flex-direction:column-reverse; overflow:hidden; background:none;}
   .cost-seg{width:100%;}
-  .cost-bar-col.today .cost-bar{background:var(--copper-bright);}
-  .cost-bar-label{font-size:9.5px; color:var(--muted); margin-top:6px; white-space:nowrap; font-family:'IBM Plex Mono',monospace;}
-  .cost-chart-total{margin-top:10px; font-size:13px; color:var(--muted);}
+  .cost-seg:first-child{border-radius:0 0 2px 2px;}
+  .cost-seg:last-child{border-radius:5px 5px 0 0;}
+  .cost-bar-col.today .cost-bar-value{color:var(--copper-bright);}
+  .cost-bar-col.today .cost-bar-label{color:var(--copper-bright); font-weight:600;}
+  .cost-bar-label{font-size:10px; color:var(--muted); margin-top:8px; white-space:nowrap; font-family:'IBM Plex Mono',monospace; line-height:1.5;}
+  .cost-bar-dow{display:block; text-transform:uppercase; font-size:8.5px; letter-spacing:.05em; opacity:.7;}
+  @keyframes growBar{ from{transform:scaleY(0);} to{transform:scaleY(1);} }
+  .cost-chart-total{margin-top:16px; font-size:13.5px; color:var(--muted); padding-top:12px; border-top:1px solid var(--line);}
+  .cost-chart-total strong{color:var(--copper-bright); font-size:15px;}
   .cost-note{font-size:11.5px; color:var(--muted); margin-top:4px;}
   .cost-legend{display:flex; flex-wrap:wrap; gap:12px; margin-top:12px;}
   .legend-item{display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted);}
   .legend-swatch{width:9px; height:9px; border-radius:2px; display:inline-block; flex-shrink:0;}
 
   nav.tabs-main{
-    display:flex; gap:4px; padding:18px 20px 0; border-bottom:1px solid var(--line); margin-top:14px;
+    position:sticky; top:0; z-index:20;
+    display:flex; gap:6px; padding:0 20px; margin-top:18px;
+    background:rgba(23,19,15,.92); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+    box-shadow:0 8px 20px -12px rgba(0,0,0,.5);
   }
   nav.tabs-main button{
-    background:none; border:none; color:var(--muted); font-family:inherit; font-size:14px; font-weight:600;
-    padding:10px 6px; cursor:pointer; border-bottom:2px solid transparent; margin-right:14px;
+    position:relative;
+    background:none; border:none; color:var(--muted); font-family:'Space Grotesk',sans-serif; font-weight:600;
+    font-size:16.5px; letter-spacing:.01em;
+    padding:16px 18px; cursor:pointer; border-bottom:3px solid transparent;
+    transition:color .15s;
   }
+  nav.tabs-main button:hover{color:var(--copper-bright);}
   nav.tabs-main button.active{color:var(--text); border-bottom-color:var(--copper);}
+  nav.tabs-main button.active::after{
+    content:""; position:absolute; left:18px; right:18px; bottom:-1px; height:3px;
+    background:var(--copper-bright); border-radius:3px 3px 0 0; filter:blur(3px); opacity:.6;
+  }
 
   main{max-width:1000px; margin:0 auto; padding:24px 20px 80px;}
   .view{display:none;}
@@ -149,6 +171,8 @@
   .rate-toggle button, .type-toggle button{flex:1;}
   .modal-actions{display:flex; gap:8px; margin-top:18px;}
   .modal-actions .btn{flex:1;}
+  .checkbox-field{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer; margin-top:-4px; margin-bottom:6px;}
+  .checkbox-field input{width:auto;}
   .existing-list{margin-bottom:16px; max-height:180px; overflow-y:auto;}
   .existing-item{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
   .existing-item .et{font-family:'IBM Plex Mono',monospace; color:var(--muted);}
@@ -276,9 +300,13 @@
       <select id="turnoEmployee"></select>
     </div>
     <div class="field-row">
-      <div class="field"><label>Entrada</label><input type="time" id="turnoStart"></div>
-      <div class="field"><label>Salida</label><input type="time" id="turnoEnd"></div>
+      <div class="field"><label>Entrada</label><input type="time" id="turnoStart" step="900"></div>
+      <div class="field"><label>Salida</label><input type="time" id="turnoEnd" step="900"></div>
     </div>
+    <label class="checkbox-field">
+      <input type="checkbox" id="turnoCierre">
+      <span>Hasta el cierre (no siempre es la misma hora)</span>
+    </label>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelTurnoBtn">Cancelar</button>
       <button class="btn" id="saveTurnoBtn">Guardar turno</button>
@@ -297,8 +325,8 @@
       <select id="manualEmployee"></select>
     </div>
     <div class="field-row">
-      <div class="field"><label>Entrada</label><input type="time" id="manualStart"></div>
-      <div class="field"><label>Salida</label><input type="time" id="manualEnd"></div>
+      <div class="field"><label>Entrada</label><input type="time" id="manualStart" step="900"></div>
+      <div class="field"><label>Salida</label><input type="time" id="manualEnd" step="900"></div>
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelDayBtn">Cerrar</button>
@@ -550,6 +578,7 @@
     const days = getDailyCostsByEmployee(currentPeriod);
     const todayStr = isoDate(new Date());
     const max = Math.max(...days.map(d => d.total), 1);
+    const DOW_LETTERS = ['L','M','X','J','V','S','D'];
 
     const bars = days.map(d => {
       const segs = d.perEmp.filter(p => p.cost > 0).map(p => {
@@ -557,21 +586,30 @@
         return `<div class="cost-seg" style="height:${segH}%; background:${colorForEmployee(p.emp.id)}" title="${escapeHtml(p.emp.name)}: ${p.cost.toFixed(2)} €"></div>`;
       }).join('');
       const isToday = isoDate(d.date) === todayStr;
+      const dow = DOW_LETTERS[(d.date.getDay() + 6) % 7];
       return `
         <div class="cost-bar-col ${isToday ? 'today' : ''}">
           <div class="cost-bar-value">${d.total > 0 ? d.total.toFixed(0) + '€' : ''}</div>
           <div class="cost-bar stacked">${segs}</div>
-          <div class="cost-bar-label">${fmtDateShort(d.date)}</div>
+          <div class="cost-bar-label"><span class="cost-bar-dow">${dow}</span>${fmtDateShort(d.date)}</div>
         </div>`;
     }).join('');
+
+    const avg = days.reduce((s,d) => s + d.total, 0) / days.length;
+    const avgPct = Math.min((avg / max) * 100, 100);
+    const avgLineHtml = avg > 0 ? `
+      <div class="cost-avg-line" style="bottom:${avgPct}%"></div>
+      <div class="cost-avg-label" style="bottom:${avgPct}%">media ${avg.toFixed(0)}€</div>` : '';
 
     const legend = hourlyEmployees.map(e => `<span class="legend-item"><span class="legend-swatch" style="background:${colorForEmployee(e.id)}"></span>${escapeHtml(e.name)}</span>`).join('');
     const grandTotal = days.reduce((s,d) => s + d.total, 0);
 
     wrap.innerHTML = `
-      <div class="cost-chart">${bars}</div>
-      <div class="cost-legend">${legend}</div>
-      <div class="cost-chart-total">Total ${currentPeriod === 'semana' ? 'esta semana' : 'este mes'} (por hora): <strong>${grandTotal.toFixed(2)} €</strong></div>`;
+      <div class="cost-chart-card">
+        <div class="cost-chart">${avgLineHtml}${bars}</div>
+        <div class="cost-legend">${legend}</div>
+        <div class="cost-chart-total">Total ${currentPeriod === 'semana' ? 'esta semana' : 'este mes'} (por hora): <strong>${grandTotal.toFixed(2)} €</strong></div>
+      </div>`;
   }
 
   // ---------- Horario ----------
@@ -603,7 +641,7 @@
         .sort((a,b) => a.s.start.localeCompare(b.s.start));
       const chips = list.map(({s, emp}) => `
         <div class="turno-chip ${type}" data-edit-turno="${s.id}">
-          <span>${escapeHtml(emp.name)}<span class="turno-time">${s.start}–${s.end}</span></span>
+          <span>${escapeHtml(emp.name)}<span class="turno-time">${s.start}–${s.end === 'cierre' ? 'Cierre' : s.end}</span></span>
           <button class="icon-btn" data-del-turno="${s.id}" title="Eliminar">✕</button>
         </div>`).join('');
       return chips || '<div class="empty-slot">Sin turnos</div>';
@@ -628,6 +666,13 @@
     }).join('');
   }
 
+  function toggleTurnoEndInput(){
+    const cierre = $('#turnoCierre').checked;
+    $('#turnoEnd').disabled = cierre;
+    $('#turnoEnd').style.opacity = cierre ? '.4' : '1';
+  }
+  $('#turnoCierre').addEventListener('change', toggleTurnoEndInput);
+
   function openTurnoModal(dayIdx, turnoId, presetType){
     turnoDay = dayIdx;
     editingTurnoId = turnoId || null;
@@ -639,7 +684,10 @@
     if(pool.length === 0) sel.innerHTML = '<option value="">No hay empleados de este tipo</option>';
     if(t) sel.value = t.employeeId;
     $('#turnoStart').value = t ? t.start : '12:00';
-    $('#turnoEnd').value = t ? t.end : '16:00';
+    const isCierre = t && t.end === 'cierre';
+    $('#turnoEnd').value = isCierre ? '' : (t ? t.end : '16:00');
+    $('#turnoCierre').checked = !!isCierre;
+    toggleTurnoEndInput();
     $('#turnoModalBackdrop').classList.add('open');
   }
   function closeTurnoModal(){ $('#turnoModalBackdrop').classList.remove('open'); editingTurnoId = null; }
@@ -675,7 +723,7 @@
         if(list.length === 0){
           doc.setTextColor(140); doc.text('Sin turnos', 22, y); doc.setTextColor(0); y += 6;
         } else {
-          list.forEach(({s, emp}) => { doc.text(`${emp.name}   ${s.start}–${s.end}`, 22, y); y += 6; });
+          list.forEach(({s, emp}) => { doc.text(`${emp.name}   ${s.start}–${s.end === 'cierre' ? 'Cierre' : s.end}`, 22, y); y += 6; });
         }
       });
       y += 4;
@@ -905,7 +953,8 @@
   $('#saveTurnoBtn').addEventListener('click', async () => {
     const empId = $('#turnoEmployee').value;
     const start = $('#turnoStart').value;
-    const end = $('#turnoEnd').value;
+    const cierre = $('#turnoCierre').checked;
+    const end = cierre ? 'cierre' : $('#turnoEnd').value;
     if(!empId){ alert('Añade primero un empleado en la pestaña Fichar'); return; }
     if(!start || !end){ alert('Rellena entrada y salida'); return; }
     const weekKey = isoDate(currentWeekStart);
@@ -950,8 +999,8 @@
     if(!empId){ alert('Añade primero un empleado en la pestaña Fichar'); return; }
     if(!start || !end){ alert('Rellena entrada y salida'); return; }
     const clockIn = new Date(selectedDay + 'T' + start + ':00');
-    const clockOut = new Date(selectedDay + 'T' + end + ':00');
-    if(clockOut <= clockIn){ alert('La salida debe ser después de la entrada'); return; }
+    let clockOut = new Date(selectedDay + 'T' + end + ':00');
+    if(clockOut <= clockIn) clockOut.setDate(clockOut.getDate() + 1); // turno que cruza la medianoche
     entries.push({id:uid(), employeeId:empId, clockIn:clockIn.toISOString(), clockOut:clockOut.toISOString(), source:'manual'});
     await saveEntries();
     renderDayEntriesList();
