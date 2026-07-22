@@ -309,7 +309,7 @@
 
 <script>
 (function(){
-  const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxZ5MaNcM4vgi05kSpc37b8sGJ6fMiVXPYDl4TlGDxr_FINLtEBUt3w1sBCg15rZCZh9w/exec';
+  const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxCHmBK36LK_zFtjbPDuo5XVow-HwORNjq3mrjY30i3L5zcIb1npzg_F_mMVb28xTx8eA/exec';
   // Namespaced keys so this app never collides with the inventory app's keys on the same sheet.
   const K_EMPLOYEES = 'tc_employees';
   const K_ENTRIES = 'tc_timeEntries';
@@ -374,9 +374,16 @@
     return data;
   }
 
+  function localSet(key, value){
+    try{ localStorage.setItem(key, value); }catch(e){ /* modo privado o storage lleno: seguimos sin caché local */ }
+  }
+  function localGet(key){
+    try{ return localStorage.getItem(key); }catch(e){ return null; }
+  }
+
   async function saveEmployees(){
     try{
-      await window.storage.set('tc_employees_cache', JSON.stringify(employees)).catch(()=>{});
+      localSet('tc_employees_cache', JSON.stringify(employees));
       setSyncStatus('Guardando…');
       await postKeys({[K_EMPLOYEES]: JSON.stringify(employees)});
       setSyncStatus('Guardado en Google Sheets ✓');
@@ -384,7 +391,7 @@
   }
   async function saveEntries(){
     try{
-      await window.storage.set('tc_entries_cache', JSON.stringify(entries)).catch(()=>{});
+      localSet('tc_entries_cache', JSON.stringify(entries));
       setSyncStatus('Guardando…');
       await postKeys({[K_ENTRIES]: JSON.stringify(entries)});
       setSyncStatus('Guardado en Google Sheets ✓');
@@ -392,7 +399,7 @@
   }
   async function saveSchedule(){
     try{
-      await window.storage.set('tc_schedule_cache', JSON.stringify(schedule)).catch(()=>{});
+      localSet('tc_schedule_cache', JSON.stringify(schedule));
       setSyncStatus('Guardando…');
       await postKeys({[K_SCHEDULE]: JSON.stringify(schedule)});
       setSyncStatus('Guardado en Google Sheets ✓');
@@ -406,20 +413,18 @@
       entries = data[K_ENTRIES] ? JSON.parse(data[K_ENTRIES]) : [];
       schedule = data[K_SCHEDULE] ? JSON.parse(data[K_SCHEDULE]) : [];
       setSyncStatus('Conectado a Google Sheets ✓');
-      // keep a local mirror in case of a future offline load
-      window.storage.set('tc_employees_cache', JSON.stringify(employees)).catch(()=>{});
-      window.storage.set('tc_entries_cache', JSON.stringify(entries)).catch(()=>{});
-      window.storage.set('tc_schedule_cache', JSON.stringify(schedule)).catch(()=>{});
+      // guardamos una copia local por si algún día falla la conexión
+      localSet('tc_employees_cache', JSON.stringify(employees));
+      localSet('tc_entries_cache', JSON.stringify(entries));
+      localSet('tc_schedule_cache', JSON.stringify(schedule));
     }catch(err){
       setSyncStatus('Sin conexión con Sheets — usando copia local. ' + err.message, true);
-      try{
-        const e1 = await window.storage.get('tc_employees_cache').catch(()=>null);
-        employees = e1 ? JSON.parse(e1.value) : [];
-        const e2 = await window.storage.get('tc_entries_cache').catch(()=>null);
-        entries = e2 ? JSON.parse(e2.value) : [];
-        const e3 = await window.storage.get('tc_schedule_cache').catch(()=>null);
-        schedule = e3 ? JSON.parse(e3.value) : [];
-      }catch(err2){ employees = []; entries = []; schedule = []; }
+      const e1 = localGet('tc_employees_cache');
+      employees = e1 ? JSON.parse(e1) : [];
+      const e2 = localGet('tc_entries_cache');
+      entries = e2 ? JSON.parse(e2) : [];
+      const e3 = localGet('tc_schedule_cache');
+      schedule = e3 ? JSON.parse(e3) : [];
     }
   }
 
