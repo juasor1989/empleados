@@ -144,9 +144,14 @@
   .timeline-body{position:relative; flex:1; background:var(--bg); border-radius:6px; cursor:crosshair; overflow:hidden;}
   .timeline-gridline{position:absolute; left:0; right:0; border-top:1px solid var(--line);}
   .tl-block{
-    position:absolute; border-radius:5px; padding:4px 6px; font-size:10.5px; line-height:1.3; overflow:hidden;
+    position:absolute; border-radius:5px; padding:4px 6px 4px 11px; font-size:10.5px; line-height:1.3; overflow:hidden;
     cursor:pointer; color:#17130f; box-shadow:0 1px 3px rgba(0,0,0,.35); border:1px solid rgba(0,0,0,.15);
   }
+  .tl-block::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:6px;
+  }
+  .tl-block.barra::before{background:repeating-linear-gradient(135deg, var(--barra), var(--barra) 3px, #1c140d 3px, #1c140d 4px);}
+  .tl-block.cocina::before{background:repeating-linear-gradient(45deg, var(--cocina), var(--cocina) 3px, #1c140d 3px, #1c140d 4px);}
   .tl-block.cierre{-webkit-mask-image:linear-gradient(180deg, #000 60%, transparent 100%); mask-image:linear-gradient(180deg, #000 60%, transparent 100%);}
   .tl-block .tl-name{display:block; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .tl-block .tl-time{display:block; font-family:'IBM Plex Mono',monospace; opacity:.85; white-space:nowrap;}
@@ -156,6 +161,12 @@
   }
   .tl-del:hover{opacity:1;}
   .empty-slot{font-size:11.5px; color:var(--muted); padding:2px 0 10px;}
+
+  .role-key{display:flex; gap:16px; font-size:11px; color:var(--muted); margin:2px 0 12px; align-items:center;}
+  .role-key span{display:flex; align-items:center; gap:6px;}
+  .role-key .swatch-stripe{width:14px; height:14px; border-radius:3px; display:inline-block;}
+  .role-key .swatch-stripe.barra{background:repeating-linear-gradient(135deg, var(--barra), var(--barra) 3px, #1c140d 3px, #1c140d 4px);}
+  .role-key .swatch-stripe.cocina{background:repeating-linear-gradient(45deg, var(--cocina), var(--cocina) 3px, #1c140d 3px, #1c140d 4px);}
 
   /* Calendario */
   .month-nav{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
@@ -176,6 +187,7 @@
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px;}
   .field input, .field select{width:100%; padding:9px 10px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-family:inherit; font-size:14px;}
+  .field input[type="color"]{height:39px; padding:3px; cursor:pointer;}
   .field-row{display:flex; gap:10px;}
   .field-row .field{flex:1;}
   .rate-toggle, .type-toggle{display:flex; gap:8px;}
@@ -272,7 +284,11 @@
         <span class="week-label mono" id="weekLabel"></span>
         <button class="btn ghost small" id="nextWeekBtn">›</button>
       </div>
-      <div class="cost-legend" id="scheduleLegend" style="margin-bottom:14px;"></div>
+      <div class="cost-legend" id="scheduleLegend" style="margin-bottom:6px;"></div>
+      <div class="role-key">
+        <span><span class="swatch-stripe barra"></span>Barra</span>
+        <span><span class="swatch-stripe cocina"></span>Cocina</span>
+      </div>
       <div class="days-row timeline-row" id="scheduleGrid"></div>
     </div>
 
@@ -297,11 +313,17 @@
       <label>Nombre</label>
       <input type="text" id="empName" placeholder="Ej. Mikel">
     </div>
-    <div class="field">
-      <label>Puesto</label>
-      <div class="type-toggle">
-        <button type="button" class="btn ghost" id="typeBarraBtn">Barra</button>
-        <button type="button" class="btn ghost" id="typeCocinaBtn">Cocina</button>
+    <div class="field-row">
+      <div class="field" style="flex:2">
+        <label>Puesto</label>
+        <div class="type-toggle">
+          <button type="button" class="btn ghost" id="typeBarraBtn">Barra</button>
+          <button type="button" class="btn ghost" id="typeCocinaBtn">Cocina</button>
+        </div>
+      </div>
+      <div class="field" style="flex:1">
+        <label>Color</label>
+        <input type="color" id="empColor" value="#c17845">
       </div>
     </div>
     <div class="field">
@@ -612,9 +634,11 @@
 
   // ---------- Gasto por día ----------
   const EMP_COLORS = ['#c17845','#5b8fae','#8a9c5e','#b3543f','#c1a45c','#7a6bae','#4a9c8c','#c1615c','#5c9cae','#9c8a5e'];
+  function defaultColorForIndex(idx){ return EMP_COLORS[idx % EMP_COLORS.length]; }
   function colorForEmployee(empId){
     const idx = employees.findIndex(e => e.id === empId);
-    return EMP_COLORS[idx % EMP_COLORS.length];
+    if(idx === -1) return EMP_COLORS[0];
+    return employees[idx].color || defaultColorForIndex(idx);
   }
 
   function getDailyCostsByEmployee(period){
@@ -697,6 +721,34 @@
     return pad(Math.floor(total/60)) + ':' + pad(total % 60);
   }
 
+  function layoutDayShifts(weekKey, dayIdx){
+    const dayShifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx)
+      .map(s => {
+        const emp = employees.find(e => e.id === s.employeeId);
+        const startMin = toRangeMinutes(s.start);
+        let endMin = s.end === 'cierre' ? TL_TOTAL_MIN : toRangeMinutes(s.end);
+        if(endMin <= startMin) endMin = TL_TOTAL_MIN;
+        return {s, emp, startMin, endMin};
+      })
+      .filter(x => x.emp);
+    const sorted = [...dayShifts].sort((a,b) => a.startMin - b.startMin);
+    const laneEnds = [];
+    sorted.forEach(item => {
+      let lane = laneEnds.findIndex(end => end <= item.startMin);
+      if(lane === -1){ lane = laneEnds.length; laneEnds.push(item.endMin); }
+      else laneEnds[lane] = item.endMin;
+      item.lane = lane;
+    });
+    return {items:sorted, laneCount:Math.max(laneEnds.length,1)};
+  }
+
+  function hexToRgb(hex){
+    const h = hex.replace('#','');
+    const full = h.length === 3 ? h.split('').map(c => c+c).join('') : h;
+    const num = parseInt(full, 16);
+    return [(num>>16)&255, (num>>8)&255, num&255];
+  }
+
   function renderScheduleWeekLabel(){
     const end = new Date(currentWeekStart); end.setDate(currentWeekStart.getDate() + 6);
     $('#weekLabel').textContent = `${fmtDate(currentWeekStart)} – ${fmtDate(end)}`;
@@ -729,26 +781,7 @@
     for(let m = 0; m <= TL_TOTAL_MIN; m += 120) hourMarks.push(m);
 
     wrap.innerHTML = DOW_NAMES.map((name, dayIdx) => {
-      const dayShifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx)
-        .map(s => {
-          const emp = employees.find(e => e.id === s.employeeId);
-          const startMin = toRangeMinutes(s.start);
-          let endMin = s.end === 'cierre' ? TL_TOTAL_MIN : toRangeMinutes(s.end);
-          if(endMin <= startMin) endMin = TL_TOTAL_MIN;
-          return {s, emp, startMin, endMin};
-        })
-        .filter(x => x.emp);
-
-      // Carriles para turnos que se superponen en el tiempo
-      const sorted = [...dayShifts].sort((a,b) => a.startMin - b.startMin);
-      const laneEnds = [];
-      sorted.forEach(item => {
-        let lane = laneEnds.findIndex(end => end <= item.startMin);
-        if(lane === -1){ lane = laneEnds.length; laneEnds.push(item.endMin); }
-        else laneEnds[lane] = item.endMin;
-        item.lane = lane;
-      });
-      const laneCount = Math.max(laneEnds.length, 1);
+      const {items: sorted, laneCount} = layoutDayShifts(weekKey, dayIdx);
 
       const hourLabelsHtml = hourMarks.map(m => `<span style="top:${m*TL_PX_PER_MIN}px">${rangeMinutesToTime(m).slice(0,2)}</span>`).join('');
       const gridlinesHtml = hourMarks.map(m => `<div class="timeline-gridline" style="top:${m*TL_PX_PER_MIN}px"></div>`).join('');
@@ -759,7 +792,7 @@
         const leftPct = lane * widthPct;
         const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
         return `
-          <div class="tl-block ${s.end === 'cierre' ? 'cierre' : ''}" data-edit-turno="${s.id}"
+          <div class="tl-block ${emp.type} ${s.end === 'cierre' ? 'cierre' : ''}" data-edit-turno="${s.id}"
                style="top:${top}px; height:${height}px; left:calc(${leftPct}% + 2px); width:calc(${widthPct}% - 4px); background:${colorForEmployee(emp.id)}"
                title="${escapeHtml(emp.name)} · ${s.start}–${endLabel}">
             <button class="tl-del" data-del-turno="${s.id}" title="Eliminar">✕</button>
@@ -811,38 +844,80 @@
   async function exportScheduleToPdf(){
     if(employees.length === 0){ alert('Añade empleados y turnos antes de exportar.'); return; }
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+    const pageW = doc.internal.pageSize.getWidth();
     const dayDates = scheduleDayDates();
     const weekEnd = dayDates[6];
-
-    doc.setFontSize(16); doc.text('Horario · La Sede', 14, 18);
-    doc.setFontSize(10); doc.setTextColor(120); doc.text(`Semana del ${fmtDate(currentWeekStart)} al ${fmtDate(weekEnd)}`, 14, 25);
-    doc.setTextColor(0);
-
-    let y = 36;
     const weekKey = isoDate(currentWeekStart);
-    DOW_NAMES.forEach((name, dayIdx) => {
-      if(y > 260){ doc.addPage(); y = 20; }
-      doc.setFontSize(12); doc.setFont(undefined, 'bold');
-      doc.text(`${name} · ${fmtDate(dayDates[dayIdx])}`, 14, y); y += 7;
-      doc.setFont(undefined, 'normal'); doc.setFontSize(10.5);
 
-      const dayShifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx);
-      ['barra','cocina'].forEach(type => {
-        const list = dayShifts
-          .map(s => ({s, emp: employees.find(e => e.id === s.employeeId)}))
-          .filter(x => x.emp && x.emp.type === type)
-          .sort((a,b) => a.s.start.localeCompare(b.s.start));
-        doc.setFont(undefined, 'bold'); doc.setTextColor(100);
-        doc.text(type === 'barra' ? 'Barra' : 'Cocina', 18, y); doc.setTextColor(0); doc.setFont(undefined, 'normal');
-        y += 5.5;
-        if(list.length === 0){
-          doc.setTextColor(140); doc.text('Sin turnos', 22, y); doc.setTextColor(0); y += 6;
-        } else {
-          list.forEach(({s, emp}) => { doc.text(`${emp.name}   ${s.start}–${s.end === 'cierre' ? 'Cierre' : s.end}`, 22, y); y += 6; });
-        }
+    const MARGIN_L = 12, MARGIN_R = 8, GUTTER = 9, COL_GAP = 1.5;
+    const TIMELINE_TOP = 33, TIMELINE_H = 152;
+    const MM_PER_MIN = TIMELINE_H / TL_TOTAL_MIN;
+
+    doc.setFont(undefined, 'bold'); doc.setFontSize(15); doc.setTextColor(30,20,12);
+    doc.text('Horario · La Sede', MARGIN_L, 13);
+    doc.setFont(undefined, 'normal'); doc.setFontSize(9.5); doc.setTextColor(120);
+    doc.text(`Semana del ${fmtDate(currentWeekStart)} al ${fmtDate(weekEnd)}`, MARGIN_L, 19);
+
+    const usableW = pageW - MARGIN_L - MARGIN_R - GUTTER;
+    const colW = (usableW - 6*COL_GAP) / 7;
+    const colsStartX = MARGIN_L + GUTTER;
+
+    // Líneas horarias cada 2h
+    doc.setDrawColor(224,213,196); doc.setLineWidth(0.15);
+    for(let m = 0; m <= TL_TOTAL_MIN; m += 120){
+      const y = TIMELINE_TOP + m*MM_PER_MIN;
+      doc.line(colsStartX, y, colsStartX + 7*colW + 6*COL_GAP, y);
+      doc.setFontSize(6.5); doc.setTextColor(150);
+      doc.text(rangeMinutesToTime(m).slice(0,2) + 'h', MARGIN_L, y + 1.1);
+    }
+
+    DOW_NAMES.forEach((name, dayIdx) => {
+      const x = colsStartX + dayIdx*(colW + COL_GAP);
+
+      doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.setTextColor(40,30,20);
+      doc.text(name.slice(0,3), x, 28);
+      doc.setFont(undefined, 'normal'); doc.setFontSize(7); doc.setTextColor(130);
+      doc.text(fmtDate(dayDates[dayIdx]), x, 31.5);
+
+      doc.setFillColor(250,247,242);
+      doc.rect(x, TIMELINE_TOP, colW, TIMELINE_H, 'F');
+
+      const {items, laneCount} = layoutDayShifts(weekKey, dayIdx);
+      items.forEach(({s, emp, startMin, endMin, lane}) => {
+        const blockW = colW / laneCount;
+        const bx = x + lane*blockW;
+        const by = TIMELINE_TOP + startMin*MM_PER_MIN;
+        const bh = Math.max((endMin - startMin)*MM_PER_MIN, 8);
+        const [r,g,b] = hexToRgb(colorForEmployee(emp.id));
+
+        doc.setFillColor(r,g,b);
+        doc.roundedRect(bx+0.4, by+0.4, blockW-0.8, bh-0.8, 0.8, 0.8, 'F');
+
+        const roleRgb = emp.type === 'cocina' ? [193,131,74] : [91,143,174];
+        doc.setFillColor(roleRgb[0], roleRgb[1], roleRgb[2]);
+        doc.rect(bx+0.4, by+0.4, 1, bh-0.8, 'F');
+
+        doc.setTextColor(20,14,10); doc.setFontSize(6.6); doc.setFont(undefined, 'bold');
+        doc.text(emp.name, bx+2, by+3);
+        doc.setFont(undefined, 'normal'); doc.setFontSize(5.8);
+        const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
+        doc.text(`${s.start}–${endLabel}`, bx+2, by+6.2);
       });
-      y += 4;
+    });
+
+    // Leyenda
+    let ly = TIMELINE_TOP + TIMELINE_H + 9;
+    let lx = MARGIN_L;
+    doc.setFontSize(7.5);
+    employees.forEach(emp => {
+      const [r,g,b] = hexToRgb(colorForEmployee(emp.id));
+      doc.setFillColor(r,g,b); doc.rect(lx, ly-3, 3, 3, 'F');
+      const label = `${emp.name} (${emp.type === 'cocina' ? 'Cocina' : 'Barra'})`;
+      doc.setTextColor(70); doc.setFont(undefined, 'normal');
+      doc.text(label, lx+4.5, ly);
+      lx += doc.getTextWidth(label) + 12;
+      if(lx > pageW - 45){ lx = MARGIN_L; ly += 6; }
     });
 
     const fileName = `horario-lasede-${isoDate(currentWeekStart)}.pdf`;
@@ -1016,6 +1091,8 @@
     $('#empRate').value = emp ? emp.rate : '';
     setRateType(emp ? emp.rateType : 'hourly');
     setEmpType(emp ? emp.type : 'barra');
+    const idx = emp ? employees.findIndex(e => e.id === empId) : employees.length;
+    $('#empColor').value = emp ? (emp.color || defaultColorForIndex(idx)) : defaultColorForIndex(idx);
     empBackdrop.classList.add('open');
     $('#empName').focus();
   }
@@ -1032,13 +1109,14 @@
   $('#saveEmpBtn').addEventListener('click', async () => {
     const name = $('#empName').value.trim();
     const rate = parseFloat($('#empRate').value);
+    const color = $('#empColor').value;
     if(!name){ alert('Escribe un nombre'); return; }
     if(isNaN(rate) || rate < 0){ alert('Introduce un importe válido'); return; }
     if(editingEmpId){
       const emp = employees.find(e => e.id === editingEmpId);
-      emp.name = name; emp.rateType = rateType; emp.rate = rate; emp.type = empType;
+      emp.name = name; emp.rateType = rateType; emp.rate = rate; emp.type = empType; emp.color = color;
     } else {
-      employees.push({id:uid(), name, rateType, rate, type: empType});
+      employees.push({id:uid(), name, rateType, rate, type: empType, color});
     }
     await saveEmployees();
     closeEmployeeModal();
