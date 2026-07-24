@@ -130,21 +130,32 @@
   .week-nav{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
   .week-nav .week-label{font-weight:600; font-family:'IBM Plex Mono',monospace; font-size:14px;}
   .days-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:12px;}
-  .day-card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px;}
-  .day-card .day-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--line);}
+  .timeline-row{align-items:start;}
+  .day-card{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px;}
+  .day-card .day-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line);}
   .day-card .day-name{font-weight:600; font-size:14px;}
   .day-card .day-date{font-size:11.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace;}
-  .type-section-label{font-size:10px; text-transform:uppercase; letter-spacing:.09em; font-weight:700; margin:4px 0 8px;}
-  .type-section-label.barra{color:var(--barra);}
-  .type-section-label.cocina{color:var(--cocina);}
-  .type-divider{height:1px; background:var(--line); margin:14px 0;}
-  .turno-chip{display:flex; justify-content:space-between; align-items:center; border-radius:6px; padding:7px 10px; margin-bottom:6px; font-size:12.5px; cursor:pointer;}
-  .turno-chip.barra{background:var(--barra-bg); color:var(--barra);}
-  .turno-chip.cocina{background:var(--cocina-bg); color:var(--cocina);}
-  .turno-chip .turno-time{font-family:'IBM Plex Mono',monospace; margin-left:6px; opacity:.85;}
-  .empty-slot{font-size:11.5px; color:var(--muted); padding:2px 0 10px;}
-  .add-turno-btn{width:100%; padding:6px; border-radius:6px; border:1px dashed var(--line); background:transparent; color:var(--muted); cursor:pointer; font-size:11.5px; margin-bottom:2px;}
+  .add-turno-btn{width:100%; padding:6px; border-radius:6px; border:1px dashed var(--line); background:transparent; color:var(--muted); cursor:pointer; font-size:11.5px; margin-top:8px;}
   .add-turno-btn:hover{color:var(--copper-bright); border-color:var(--copper);}
+
+  .timeline-wrap{display:flex; gap:6px;}
+  .timeline-hours{display:flex; flex-direction:column; font-size:9.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace; text-align:right; flex-shrink:0; width:26px; position:relative;}
+  .timeline-hours span{position:absolute; right:0; transform:translateY(-50%);}
+  .timeline-body{position:relative; flex:1; background:var(--bg); border-radius:6px; cursor:crosshair; overflow:hidden;}
+  .timeline-gridline{position:absolute; left:0; right:0; border-top:1px solid var(--line);}
+  .tl-block{
+    position:absolute; border-radius:5px; padding:4px 6px; font-size:10.5px; line-height:1.3; overflow:hidden;
+    cursor:pointer; color:#17130f; box-shadow:0 1px 3px rgba(0,0,0,.35); border:1px solid rgba(0,0,0,.15);
+  }
+  .tl-block.cierre{-webkit-mask-image:linear-gradient(180deg, #000 60%, transparent 100%); mask-image:linear-gradient(180deg, #000 60%, transparent 100%);}
+  .tl-block .tl-name{display:block; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tl-block .tl-time{display:block; font-family:'IBM Plex Mono',monospace; opacity:.85; white-space:nowrap;}
+  .tl-del{
+    position:absolute; top:1px; right:2px; background:none; border:none; color:#17130f; opacity:.5;
+    font-size:10px; cursor:pointer; padding:2px;
+  }
+  .tl-del:hover{opacity:1;}
+  .empty-slot{font-size:11.5px; color:var(--muted); padding:2px 0 10px;}
 
   /* Calendario */
   .month-nav{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
@@ -173,6 +184,22 @@
   .modal-actions .btn{flex:1;}
   .checkbox-field{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); cursor:pointer; margin-top:-4px; margin-bottom:6px;}
   .checkbox-field input{width:auto;}
+
+  .quick-actions{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+  .quick-actions .btn{flex:1;}
+  .quick-shifts{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;}
+  .shift-preset{
+    flex:1; min-width:90px; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    border-radius:6px; padding:8px 6px; font-size:11.5px; font-family:inherit; cursor:pointer; text-align:center;
+  }
+  .shift-preset:hover{border-color:var(--copper); color:var(--copper-bright);}
+  .dow-picker{display:flex; gap:4px; margin:10px 0 16px;}
+  .dow-picker label{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; color:var(--muted);
+    background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:6px 0; cursor:pointer;
+  }
+  .dow-picker input{width:auto; margin:0;}
+  .dow-picker label:has(input:checked){border-color:var(--copper); color:var(--copper-bright);}
   .existing-list{margin-bottom:16px; max-height:180px; overflow-y:auto;}
   .existing-item{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
   .existing-item .et{font-family:'IBM Plex Mono',monospace; color:var(--muted);}
@@ -235,14 +262,18 @@
     <div class="view" id="view-horario">
       <div class="section-title">
         <h2>Planificación semanal</h2>
-        <button class="btn ghost small" id="shareScheduleBtn">📄 Compartir horario (PDF)</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn ghost small" id="copyWeekBtn">⧉ Copiar esta semana a…</button>
+          <button class="btn ghost small" id="shareScheduleBtn">📄 Compartir horario (PDF)</button>
+        </div>
       </div>
       <div class="week-nav">
         <button class="btn ghost small" id="prevWeekBtn">‹</button>
         <span class="week-label mono" id="weekLabel"></span>
         <button class="btn ghost small" id="nextWeekBtn">›</button>
       </div>
-      <div class="days-row" id="scheduleGrid"></div>
+      <div class="cost-legend" id="scheduleLegend" style="margin-bottom:14px;"></div>
+      <div class="days-row timeline-row" id="scheduleGrid"></div>
     </div>
 
     <!-- CALENDARIO -->
@@ -300,8 +331,8 @@
       <select id="turnoEmployee"></select>
     </div>
     <div class="field-row">
-      <div class="field"><label>Entrada</label><input type="time" id="turnoStart" step="900"></div>
-      <div class="field"><label>Salida</label><input type="time" id="turnoEnd" step="900"></div>
+      <div class="field"><label>Entrada</label><select id="turnoStart"></select></div>
+      <div class="field"><label>Salida</label><select id="turnoEnd"></select></div>
     </div>
     <label class="checkbox-field">
       <input type="checkbox" id="turnoCierre">
@@ -319,15 +350,49 @@
   <div class="modal">
     <h3 id="dayModalTitle">Horas del día</h3>
     <div class="existing-list" id="dayEntriesList"></div>
+
+    <div class="quick-actions">
+      <button class="btn ghost small" id="useScheduleBtn">📋 Usar lo planificado</button>
+      <button class="btn ghost small" id="copyYesterdayBtn">↩ Copiar de ayer</button>
+    </div>
+
     <hr class="sep">
     <div class="field">
       <label>Empleado</label>
       <select id="manualEmployee"></select>
     </div>
-    <div class="field-row">
-      <div class="field"><label>Entrada</label><input type="time" id="manualStart" step="900"></div>
-      <div class="field"><label>Salida</label><input type="time" id="manualEnd" step="900"></div>
+
+    <div class="quick-shifts">
+      <button type="button" class="shift-preset" data-start="08:00" data-end="16:00">☀ Mañana 08–16</button>
+      <button type="button" class="shift-preset" data-start="16:00" data-end="00:00">🌇 Tarde 16–00</button>
+      <button type="button" class="shift-preset" data-start="00:00" data-end="08:00">🌙 Noche 00–08</button>
     </div>
+
+    <div class="field-row">
+      <div class="field"><label>Entrada</label><select id="manualStart"></select></div>
+      <div class="field"><label>Salida</label><select id="manualEnd"></select></div>
+    </div>
+
+    <label class="checkbox-field">
+      <input type="checkbox" id="manualMultiDay">
+      <span>Aplicar también a otros días</span>
+    </label>
+    <div id="multiDayOptions" style="display:none;">
+      <div class="field">
+        <label>Hasta la fecha</label>
+        <input type="date" id="multiDayUntil">
+      </div>
+      <div class="dow-picker" id="multiDayDow">
+        <label><input type="checkbox" value="0"><span>L</span></label>
+        <label><input type="checkbox" value="1"><span>M</span></label>
+        <label><input type="checkbox" value="2"><span>X</span></label>
+        <label><input type="checkbox" value="3"><span>J</span></label>
+        <label><input type="checkbox" value="4"><span>V</span></label>
+        <label><input type="checkbox" value="5"><span>S</span></label>
+        <label><input type="checkbox" value="6"><span>D</span></label>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn ghost" id="cancelDayBtn">Cerrar</button>
       <button class="btn" id="saveManualBtn">+ Añadir hora</button>
@@ -615,6 +680,23 @@
   // ---------- Horario ----------
   const DOW_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
+  // Rango visible del timeline: 06:00 a 04:00 del día siguiente (22 horas)
+  const TL_START_MIN = 6 * 60;
+  const TL_TOTAL_MIN = 22 * 60;
+  const TL_PX_PER_MIN = 0.4; // 24px por hora
+
+  function toRangeMinutes(timeStr){
+    const [h,m] = timeStr.split(':').map(Number);
+    let total = h*60 + m;
+    if(total < TL_START_MIN) total += 24*60;
+    return total - TL_START_MIN;
+  }
+  function rangeMinutesToTime(min){
+    let total = min + TL_START_MIN;
+    total = ((total % (24*60)) + 24*60) % (24*60);
+    return pad(Math.floor(total/60)) + ':' + pad(total % 60);
+  }
+
   function renderScheduleWeekLabel(){
     const end = new Date(currentWeekStart); end.setDate(currentWeekStart.getDate() + 6);
     $('#weekLabel').textContent = `${fmtDate(currentWeekStart)} – ${fmtDate(end)}`;
@@ -622,6 +704,14 @@
 
   function scheduleDayDates(){
     return DOW_NAMES.map((_, idx) => { const d = new Date(currentWeekStart); d.setDate(currentWeekStart.getDate() + idx); return d; });
+  }
+
+  function renderScheduleLegend(){
+    const wrap = $('#scheduleLegend');
+    if(employees.length === 0){ wrap.innerHTML = ''; return; }
+    wrap.innerHTML = employees.map(e => `
+      <span class="legend-item"><span class="legend-swatch" style="background:${colorForEmployee(e.id)}"></span>${escapeHtml(e.name)} <span class="tag">${e.type === 'cocina' ? 'Coc' : 'Bar'}</span></span>
+    `).join('');
   }
 
   function renderScheduleGrid(){
@@ -634,34 +724,61 @@
       return;
     }
 
-    function sectionHtml(dayShifts, type){
-      const list = dayShifts
-        .map(s => ({s, emp: employees.find(e => e.id === s.employeeId)}))
-        .filter(x => x.emp && x.emp.type === type)
-        .sort((a,b) => a.s.start.localeCompare(b.s.start));
-      const chips = list.map(({s, emp}) => `
-        <div class="turno-chip ${type}" data-edit-turno="${s.id}">
-          <span>${escapeHtml(emp.name)}<span class="turno-time">${s.start}–${s.end === 'cierre' ? 'Cierre' : s.end}</span></span>
-          <button class="icon-btn" data-del-turno="${s.id}" title="Eliminar">✕</button>
-        </div>`).join('');
-      return chips || '<div class="empty-slot">Sin turnos</div>';
-    }
+    const containerHeight = TL_TOTAL_MIN * TL_PX_PER_MIN;
+    const hourMarks = [];
+    for(let m = 0; m <= TL_TOTAL_MIN; m += 120) hourMarks.push(m);
 
     wrap.innerHTML = DOW_NAMES.map((name, dayIdx) => {
-      const dayShifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx);
+      const dayShifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx)
+        .map(s => {
+          const emp = employees.find(e => e.id === s.employeeId);
+          const startMin = toRangeMinutes(s.start);
+          let endMin = s.end === 'cierre' ? TL_TOTAL_MIN : toRangeMinutes(s.end);
+          if(endMin <= startMin) endMin = TL_TOTAL_MIN;
+          return {s, emp, startMin, endMin};
+        })
+        .filter(x => x.emp);
+
+      // Carriles para turnos que se superponen en el tiempo
+      const sorted = [...dayShifts].sort((a,b) => a.startMin - b.startMin);
+      const laneEnds = [];
+      sorted.forEach(item => {
+        let lane = laneEnds.findIndex(end => end <= item.startMin);
+        if(lane === -1){ lane = laneEnds.length; laneEnds.push(item.endMin); }
+        else laneEnds[lane] = item.endMin;
+        item.lane = lane;
+      });
+      const laneCount = Math.max(laneEnds.length, 1);
+
+      const hourLabelsHtml = hourMarks.map(m => `<span style="top:${m*TL_PX_PER_MIN}px">${rangeMinutesToTime(m).slice(0,2)}</span>`).join('');
+      const gridlinesHtml = hourMarks.map(m => `<div class="timeline-gridline" style="top:${m*TL_PX_PER_MIN}px"></div>`).join('');
+      const blocksHtml = sorted.map(({s, emp, startMin, endMin, lane}) => {
+        const top = startMin * TL_PX_PER_MIN;
+        const height = Math.max((endMin - startMin) * TL_PX_PER_MIN, 20);
+        const widthPct = 100 / laneCount;
+        const leftPct = lane * widthPct;
+        const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
+        return `
+          <div class="tl-block ${s.end === 'cierre' ? 'cierre' : ''}" data-edit-turno="${s.id}"
+               style="top:${top}px; height:${height}px; left:calc(${leftPct}% + 2px); width:calc(${widthPct}% - 4px); background:${colorForEmployee(emp.id)}"
+               title="${escapeHtml(emp.name)} · ${s.start}–${endLabel}">
+            <button class="tl-del" data-del-turno="${s.id}" title="Eliminar">✕</button>
+            <span class="tl-name">${escapeHtml(emp.name)}</span>
+            <span class="tl-time">${s.start}–${endLabel}</span>
+          </div>`;
+      }).join('');
+
       return `
         <div class="day-card">
           <div class="day-head"><span class="day-name">${name}</span><span class="day-date">${fmtDate(dayDates[dayIdx])}</span></div>
-
-          <div class="type-section-label barra">Barra</div>
-          ${sectionHtml(dayShifts, 'barra')}
-          <button class="add-turno-btn" data-add-turno="${dayIdx}" data-type="barra">+ turno de barra</button>
-
-          <div class="type-divider"></div>
-
-          <div class="type-section-label cocina">Cocina</div>
-          ${sectionHtml(dayShifts, 'cocina')}
-          <button class="add-turno-btn" data-add-turno="${dayIdx}" data-type="cocina">+ turno de cocina</button>
+          <div class="timeline-wrap">
+            <div class="timeline-hours" style="height:${containerHeight}px">${hourLabelsHtml}</div>
+            <div class="timeline-body" style="height:${containerHeight}px" data-add-turno="${dayIdx}">
+              ${gridlinesHtml}
+              ${blocksHtml}
+            </div>
+          </div>
+          <button class="add-turno-btn" data-add-turno-btn="${dayIdx}">+ Añadir turno</button>
         </div>`;
     }).join('');
   }
@@ -673,19 +790,18 @@
   }
   $('#turnoCierre').addEventListener('change', toggleTurnoEndInput);
 
-  function openTurnoModal(dayIdx, turnoId, presetType){
+  function openTurnoModal(dayIdx, turnoId, presetStart){
     turnoDay = dayIdx;
     editingTurnoId = turnoId || null;
     const t = turnoId ? schedule.find(s => s.id === turnoId) : null;
     $('#turnoModalTitle').textContent = t ? 'Editar turno' : `Añadir turno · ${DOW_NAMES[dayIdx]}`;
     const sel = $('#turnoEmployee');
-    const pool = (!t && presetType) ? employees.filter(e => e.type === presetType) : employees;
-    sel.innerHTML = pool.map(e => `<option value="${e.id}">${escapeHtml(e.name)} (${e.type === 'cocina' ? 'Cocina' : 'Barra'})</option>`).join('');
-    if(pool.length === 0) sel.innerHTML = '<option value="">No hay empleados de este tipo</option>';
+    sel.innerHTML = employees.map(e => `<option value="${e.id}">${escapeHtml(e.name)} (${e.type === 'cocina' ? 'Cocina' : 'Barra'})</option>`).join('');
+    if(employees.length === 0) sel.innerHTML = '<option value="">Añade primero un empleado</option>';
     if(t) sel.value = t.employeeId;
-    $('#turnoStart').value = t ? t.start : '12:00';
+    $('#turnoStart').value = t ? t.start : (presetStart || '12:00');
     const isCierre = t && t.end === 'cierre';
-    $('#turnoEnd').value = isCierre ? '' : (t ? t.end : '16:00');
+    $('#turnoEnd').value = isCierre ? '16:00' : (t ? t.end : '16:00');
     $('#turnoCierre').checked = !!isCierre;
     toggleTurnoEndInput();
     $('#turnoModalBackdrop').classList.add('open');
@@ -789,6 +905,10 @@
     if(employees.length === 0) sel.innerHTML = '<option value="">Añade primero un empleado</option>';
     $('#manualStart').value = '12:00';
     $('#manualEnd').value = '16:00';
+    $('#manualMultiDay').checked = false;
+    $('#multiDayOptions').style.display = 'none';
+    $('#multiDayUntil').value = '';
+    document.querySelectorAll('#multiDayDow input').forEach(cb => cb.checked = false);
     renderDayEntriesList();
     $('#dayModalBackdrop').classList.add('open');
   }
@@ -822,6 +942,7 @@
     renderSummary();
     renderDailyCostChart();
     renderScheduleWeekLabel();
+    renderScheduleLegend();
     renderScheduleGrid();
     renderMonthLabel();
     renderCalendarGrid();
@@ -931,22 +1052,56 @@
   $('#scheduleGrid').addEventListener('click', (ev) => {
     const delBtn = ev.target.closest('[data-del-turno]');
     if(delBtn){
+      ev.stopPropagation();
       if(confirm('¿Eliminar este turno?')){
         schedule = schedule.filter(s => s.id !== delBtn.dataset.delTurno);
         saveSchedule().then(renderAll);
       }
       return;
     }
-    const addBtn = ev.target.closest('[data-add-turno]');
-    if(addBtn){ openTurnoModal(parseInt(addBtn.dataset.addTurno,10), null, addBtn.dataset.type); return; }
-    const editChip = ev.target.closest('[data-edit-turno]');
-    if(editChip){
-      const t = schedule.find(s => s.id === editChip.dataset.editTurno);
+    const editBlock = ev.target.closest('[data-edit-turno]');
+    if(editBlock){
+      const t = schedule.find(s => s.id === editBlock.dataset.editTurno);
       if(t) openTurnoModal(t.day, t.id);
+      return;
+    }
+    const addBtnSmall = ev.target.closest('[data-add-turno-btn]');
+    if(addBtnSmall){ openTurnoModal(parseInt(addBtnSmall.dataset.addTurnoBtn,10), null, '12:00'); return; }
+    const timelineBody = ev.target.closest('[data-add-turno]');
+    if(timelineBody){
+      const rect = timelineBody.getBoundingClientRect();
+      const offsetY = ev.clientY - rect.top;
+      let minutes = Math.round((offsetY / TL_PX_PER_MIN) / 15) * 15;
+      minutes = Math.max(0, Math.min(minutes, TL_TOTAL_MIN - 30));
+      const presetStart = rangeMinutesToTime(minutes);
+      openTurnoModal(parseInt(timelineBody.dataset.addTurno,10), null, presetStart);
     }
   });
 
   $('#shareScheduleBtn').addEventListener('click', exportScheduleToPdf);
+
+  $('#copyWeekBtn').addEventListener('click', async () => {
+    const weekKey = isoDate(currentWeekStart);
+    const currentShifts = schedule.filter(s => s.weekStart === weekKey);
+    if(currentShifts.length === 0){ alert('Esta semana no tiene turnos que copiar.'); return; }
+    const targetStr = prompt('¿A qué semana quieres copiarla? Escribe cualquier fecha de esa semana (dd/mm/aaaa):', fmtDate(currentWeekStart));
+    if(!targetStr) return;
+    const parts = targetStr.split('/');
+    if(parts.length !== 3){ alert('Formato de fecha no válido. Usa dd/mm/aaaa.'); return; }
+    const targetDate = new Date(parseInt(parts[2],10), parseInt(parts[1],10)-1, parseInt(parts[0],10));
+    if(isNaN(targetDate.getTime())){ alert('Fecha no válida.'); return; }
+    const targetWeekStart = mondayOf(targetDate);
+    const targetWeekKey = isoDate(targetWeekStart);
+    if(targetWeekKey === weekKey){ alert('Elige una semana distinta a la actual.'); return; }
+    const existing = schedule.filter(s => s.weekStart === targetWeekKey);
+    if(existing.length > 0 && !confirm(`La semana del ${fmtDate(targetWeekStart)} ya tiene ${existing.length} turno(s). ¿Sustituirlos por los de esta semana?`)) return;
+    schedule = schedule.filter(s => s.weekStart !== targetWeekKey);
+    currentShifts.forEach(s => {
+      schedule.push({id:uid(), employeeId:s.employeeId, weekStart:targetWeekKey, day:s.day, start:s.start, end:s.end});
+    });
+    await saveSchedule();
+    alert(`Copiado a la semana del ${fmtDate(targetWeekStart)}.`);
+  });
 
   $('#cancelTurnoBtn').addEventListener('click', () => $('#turnoModalBackdrop').classList.remove('open'));
   $('#turnoModalBackdrop').addEventListener('click', (ev) => { if(ev.target.id === 'turnoModalBackdrop') closeTurnoModal(); });
@@ -992,16 +1147,94 @@
     }
   });
 
+  // B: turnos rápidos
+  document.querySelectorAll('.shift-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $('#manualStart').value = btn.dataset.start;
+      $('#manualEnd').value = btn.dataset.end;
+    });
+  });
+
+  // D: aplicar a varios días
+  $('#manualMultiDay').addEventListener('change', () => {
+    const on = $('#manualMultiDay').checked;
+    $('#multiDayOptions').style.display = on ? 'block' : 'none';
+    if(on && !$('#multiDayUntil').value){
+      const d = new Date(selectedDay + 'T00:00:00'); d.setDate(d.getDate() + 6);
+      $('#multiDayUntil').value = isoDate(d);
+      const startDow = (new Date(selectedDay + 'T00:00:00').getDay() + 6) % 7;
+      document.querySelector(`#multiDayDow input[value="${startDow}"]`).checked = true;
+    }
+  });
+
+  // C: copiar de ayer
+  $('#copyYesterdayBtn').addEventListener('click', async () => {
+    const yesterday = new Date(selectedDay + 'T00:00:00'); yesterday.setDate(yesterday.getDate() - 1);
+    const yEntries = entriesOnDate(isoDate(yesterday));
+    if(yEntries.length === 0){ alert('No hay horas registradas ayer.'); return; }
+    yEntries.forEach(e => {
+      const durMs = new Date(e.clockOut || new Date()) - new Date(e.clockIn);
+      const newIn = new Date(selectedDay + 'T00:00:00');
+      const oldIn = new Date(e.clockIn);
+      newIn.setHours(oldIn.getHours(), oldIn.getMinutes(), 0, 0);
+      const newOut = new Date(newIn.getTime() + durMs);
+      entries.push({id:uid(), employeeId:e.employeeId, clockIn:newIn.toISOString(), clockOut:newOut.toISOString(), source:'manual'});
+    });
+    await saveEntries();
+    renderDayEntriesList(); renderCalendarGrid(); renderSummary();
+  });
+
+  // A: traer lo planificado en Horario
+  $('#useScheduleBtn').addEventListener('click', async () => {
+    const d = new Date(selectedDay + 'T00:00:00');
+    const weekStartForDay = mondayOf(d);
+    const weekKey = isoDate(weekStartForDay);
+    const dayIdx = (d.getDay() + 6) % 7;
+    const shifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx);
+    if(shifts.length === 0){ alert('No hay nada planificado en el Horario para este día.'); return; }
+    let skipped = 0;
+    shifts.forEach(s => {
+      if(s.end === 'cierre'){ skipped++; return; }
+      const clockIn = new Date(selectedDay + 'T' + s.start + ':00');
+      let clockOut = new Date(selectedDay + 'T' + s.end + ':00');
+      if(clockOut <= clockIn) clockOut.setDate(clockOut.getDate() + 1);
+      entries.push({id:uid(), employeeId:s.employeeId, clockIn:clockIn.toISOString(), clockOut:clockOut.toISOString(), source:'manual'});
+    });
+    await saveEntries();
+    renderDayEntriesList(); renderCalendarGrid(); renderSummary();
+    if(skipped > 0) alert(`${skipped} turno(s) "hasta el cierre" no se importaron automáticamente — añade su hora real de salida a mano.`);
+  });
+
   $('#saveManualBtn').addEventListener('click', async () => {
     const empId = $('#manualEmployee').value;
     const start = $('#manualStart').value;
     const end = $('#manualEnd').value;
     if(!empId){ alert('Añade primero un empleado en la pestaña Fichar'); return; }
     if(!start || !end){ alert('Rellena entrada y salida'); return; }
-    const clockIn = new Date(selectedDay + 'T' + start + ':00');
-    let clockOut = new Date(selectedDay + 'T' + end + ':00');
-    if(clockOut <= clockIn) clockOut.setDate(clockOut.getDate() + 1); // turno que cruza la medianoche
-    entries.push({id:uid(), employeeId:empId, clockIn:clockIn.toISOString(), clockOut:clockOut.toISOString(), source:'manual'});
+
+    const targetDates = [selectedDay];
+    if($('#manualMultiDay').checked){
+      const until = $('#multiDayUntil').value;
+      const chosenDow = Array.from(document.querySelectorAll('#multiDayDow input:checked')).map(cb => parseInt(cb.value,10));
+      if(until && chosenDow.length > 0){
+        let cursor = new Date(selectedDay + 'T00:00:00');
+        const endDate = new Date(until + 'T00:00:00');
+        while(cursor <= endDate){
+          const dow = (cursor.getDay() + 6) % 7;
+          const ds = isoDate(cursor);
+          if(chosenDow.includes(dow) && !targetDates.includes(ds)) targetDates.push(ds);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      }
+    }
+
+    targetDates.forEach(dateStr => {
+      const clockIn = new Date(dateStr + 'T' + start + ':00');
+      let clockOut = new Date(dateStr + 'T' + end + ':00');
+      if(clockOut <= clockIn) clockOut.setDate(clockOut.getDate() + 1);
+      entries.push({id:uid(), employeeId:empId, clockIn:clockIn.toISOString(), clockOut:clockOut.toISOString(), source:'manual'});
+    });
+
     await saveEntries();
     renderDayEntriesList();
     renderCalendarGrid();
@@ -1009,6 +1242,16 @@
   });
 
   // ---------- Init ----------
+  function populateTimeSelects(){
+    let opts = '';
+    for(let m = 0; m < 24*60; m += 15){
+      const val = pad(Math.floor(m/60)) + ':' + pad(m%60);
+      opts += `<option value="${val}">${val}</option>`;
+    }
+    ['turnoStart','turnoEnd','manualStart','manualEnd'].forEach(id => { $('#'+id).innerHTML = opts; });
+  }
+  populateTimeSelects();
+
   setInterval(renderClock, 1000);
   renderClock();
 
