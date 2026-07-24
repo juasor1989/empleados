@@ -142,6 +142,11 @@
   .timeline-hours{display:flex; flex-direction:column; font-size:9.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace; text-align:right; flex-shrink:0; width:26px; position:relative;}
   .timeline-hours span{position:absolute; right:0; transform:translateY(-50%);}
   .timeline-body{position:relative; flex:1; background:var(--bg); border-radius:6px; cursor:crosshair; overflow:hidden;}
+  .timeline-body::after{content:""; position:absolute; left:50%; top:0; bottom:0; width:1px; background:rgba(240,224,199,.14); pointer-events:none;}
+  .tl-side-labels{display:flex; margin-bottom:4px; padding-left:32px;}
+  .tl-side-labels span{flex:1; text-align:center; font-size:9.5px; text-transform:uppercase; letter-spacing:.07em; font-weight:700;}
+  .tl-side-labels .barra{color:var(--barra);}
+  .tl-side-labels .cocina{color:var(--cocina);}
   .timeline-gridline{position:absolute; left:0; right:0; border-top:1px solid var(--line);}
   .tl-block{
     position:absolute; border-radius:5px; padding:4px 6px 4px 11px; font-size:10.5px; line-height:1.3; overflow:hidden;
@@ -154,7 +159,7 @@
   .tl-block.cocina::before{background:repeating-linear-gradient(45deg, var(--cocina), var(--cocina) 3px, #1c140d 3px, #1c140d 4px);}
   .tl-block.cierre{-webkit-mask-image:linear-gradient(180deg, #000 60%, transparent 100%); mask-image:linear-gradient(180deg, #000 60%, transparent 100%);}
   .tl-block .tl-name{display:block; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .tl-block .tl-time{display:block; font-family:'IBM Plex Mono',monospace; opacity:.85; white-space:nowrap;}
+  .tl-block .tl-time{display:block; font-family:'IBM Plex Mono',monospace; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
   .tl-del{
     position:absolute; top:1px; right:2px; background:none; border:none; color:#17130f; opacity:.5;
     font-size:10px; cursor:pointer; padding:2px;
@@ -237,9 +242,9 @@
 </header>
 
 <nav class="tabs-main">
-  <button class="tab-main active" data-tab="fichar">Fichar</button>
-  <button class="tab-main" data-tab="horario">Horario</button>
-  <button class="tab-main" data-tab="calendario">Calendario</button>
+  <button class="tab-main active" data-tab="fichar">⏱ Fichar</button>
+  <button class="tab-main" data-tab="horario">🗓 Horario</button>
+  <button class="tab-main" data-tab="calendario">📅 Calendario</button>
 </nav>
 
 <main>
@@ -344,6 +349,21 @@
   </div>
 </div>
 
+<!-- Modal: Confirmar hora de fichaje -->
+<div class="modal-backdrop" id="punchModalBackdrop">
+  <div class="modal">
+    <h3 id="punchModalTitle">Fichar entrada</h3>
+    <div class="field">
+      <label>Hora exacta</label>
+      <select id="punchTime"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelPunchBtn">Cancelar</button>
+      <button class="btn" id="confirmPunchBtn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Turno (Horario) -->
 <div class="modal-backdrop" id="turnoModalBackdrop">
   <div class="modal">
@@ -438,6 +458,8 @@
   let editingEmpId = null;
   let rateType = 'hourly';
   let empType = 'barra';
+  let punchingEmployeeId = null;
+  let punchingMode = null; // 'in' | 'out'
 
   let currentWeekStart = mondayOf(new Date());
 
@@ -707,7 +729,7 @@
   // Rango visible del timeline: 06:00 a 04:00 del día siguiente (22 horas)
   const TL_START_MIN = 6 * 60;
   const TL_TOTAL_MIN = 22 * 60;
-  const TL_PX_PER_MIN = 0.4; // 24px por hora
+  const TL_PX_PER_MIN = 0.48; // ~29px por hora
 
   function toRangeMinutes(timeStr){
     const [h,m] = timeStr.split(':').map(Number);
@@ -721,16 +743,17 @@
     return pad(Math.floor(total/60)) + ':' + pad(total % 60);
   }
 
-  function layoutDayShifts(weekKey, dayIdx){
+  function layoutDayShiftsByType(weekKey, dayIdx, type){
     const dayShifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx)
       .map(s => {
         const emp = employees.find(e => e.id === s.employeeId);
+        if(!emp || emp.type !== type) return null;
         const startMin = toRangeMinutes(s.start);
         let endMin = s.end === 'cierre' ? TL_TOTAL_MIN : toRangeMinutes(s.end);
         if(endMin <= startMin) endMin = TL_TOTAL_MIN;
         return {s, emp, startMin, endMin};
       })
-      .filter(x => x.emp);
+      .filter(Boolean);
     const sorted = [...dayShifts].sort((a,b) => a.startMin - b.startMin);
     const laneEnds = [];
     sorted.forEach(item => {
@@ -740,6 +763,13 @@
       item.lane = lane;
     });
     return {items:sorted, laneCount:Math.max(laneEnds.length,1)};
+  }
+
+  function fontScaleForFraction(frac){
+    if(frac >= 0.42) return 1;
+    if(frac >= 0.30) return 0.86;
+    if(frac >= 0.22) return 0.74;
+    return 0.62;
   }
 
   function hexToRgb(hex){
@@ -778,32 +808,40 @@
 
     const containerHeight = TL_TOTAL_MIN * TL_PX_PER_MIN;
     const hourMarks = [];
-    for(let m = 0; m <= TL_TOTAL_MIN; m += 120) hourMarks.push(m);
+    for(let m = 0; m <= TL_TOTAL_MIN; m += 60) hourMarks.push(m);
 
-    wrap.innerHTML = DOW_NAMES.map((name, dayIdx) => {
-      const {items: sorted, laneCount} = layoutDayShifts(weekKey, dayIdx);
-
-      const hourLabelsHtml = hourMarks.map(m => `<span style="top:${m*TL_PX_PER_MIN}px">${rangeMinutesToTime(m).slice(0,2)}</span>`).join('');
-      const gridlinesHtml = hourMarks.map(m => `<div class="timeline-gridline" style="top:${m*TL_PX_PER_MIN}px"></div>`).join('');
-      const blocksHtml = sorted.map(({s, emp, startMin, endMin, lane}) => {
+    function blocksForType(layout, type, sideOffsetPct, sideWidthPct){
+      return layout.items.map(({s, emp, startMin, endMin, lane}) => {
         const top = startMin * TL_PX_PER_MIN;
         const height = Math.max((endMin - startMin) * TL_PX_PER_MIN, 20);
-        const widthPct = 100 / laneCount;
-        const leftPct = lane * widthPct;
+        const widthPct = sideWidthPct / layout.laneCount;
+        const leftPct = sideOffsetPct + lane * widthPct;
         const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
+        const scale = fontScaleForFraction(widthPct / 100);
+        const showTime = (widthPct / 100) >= 0.20;
         return `
-          <div class="tl-block ${emp.type} ${s.end === 'cierre' ? 'cierre' : ''}" data-edit-turno="${s.id}"
-               style="top:${top}px; height:${height}px; left:calc(${leftPct}% + 2px); width:calc(${widthPct}% - 4px); background:${colorForEmployee(emp.id)}"
+          <div class="tl-block ${type} ${s.end === 'cierre' ? 'cierre' : ''}" data-edit-turno="${s.id}"
+               style="top:${top}px; height:${height}px; left:calc(${leftPct}% + 1.5px); width:calc(${widthPct}% - 3px); background:${colorForEmployee(emp.id)}; font-size:${(10*scale).toFixed(1)}px;"
                title="${escapeHtml(emp.name)} · ${s.start}–${endLabel}">
             <button class="tl-del" data-del-turno="${s.id}" title="Eliminar">✕</button>
             <span class="tl-name">${escapeHtml(emp.name)}</span>
-            <span class="tl-time">${s.start}–${endLabel}</span>
+            ${showTime ? `<span class="tl-time">${s.start}–${endLabel}</span>` : ''}
           </div>`;
       }).join('');
+    }
+
+    wrap.innerHTML = DOW_NAMES.map((name, dayIdx) => {
+      const barraLayout = layoutDayShiftsByType(weekKey, dayIdx, 'barra');
+      const cocinaLayout = layoutDayShiftsByType(weekKey, dayIdx, 'cocina');
+
+      const hourLabelsHtml = hourMarks.map(m => `<span style="top:${m*TL_PX_PER_MIN}px">${rangeMinutesToTime(m).slice(0,2)}</span>`).join('');
+      const gridlinesHtml = hourMarks.map(m => `<div class="timeline-gridline" style="top:${m*TL_PX_PER_MIN}px"></div>`).join('');
+      const blocksHtml = blocksForType(barraLayout, 'barra', 0, 50) + blocksForType(cocinaLayout, 'cocina', 50, 50);
 
       return `
         <div class="day-card">
           <div class="day-head"><span class="day-name">${name}</span><span class="day-date">${fmtDate(dayDates[dayIdx])}</span></div>
+          <div class="tl-side-labels"><span class="barra">Barra</span><span class="cocina">Cocina</span></div>
           <div class="timeline-wrap">
             <div class="timeline-hours" style="height:${containerHeight}px">${hourLabelsHtml}</div>
             <div class="timeline-body" style="height:${containerHeight}px" data-add-turno="${dayIdx}">
@@ -863,47 +901,61 @@
     const colW = (usableW - 6*COL_GAP) / 7;
     const colsStartX = MARGIN_L + GUTTER;
 
-    // Líneas horarias cada 2h
-    doc.setDrawColor(224,213,196); doc.setLineWidth(0.15);
-    for(let m = 0; m <= TL_TOTAL_MIN; m += 120){
+    // Líneas horarias cada hora
+    doc.setDrawColor(224,213,196); doc.setLineWidth(0.12);
+    for(let m = 0; m <= TL_TOTAL_MIN; m += 60){
       const y = TIMELINE_TOP + m*MM_PER_MIN;
       doc.line(colsStartX, y, colsStartX + 7*colW + 6*COL_GAP, y);
-      doc.setFontSize(6.5); doc.setTextColor(150);
-      doc.text(rangeMinutesToTime(m).slice(0,2) + 'h', MARGIN_L, y + 1.1);
+      doc.setFontSize(5.8); doc.setTextColor(150);
+      doc.text(rangeMinutesToTime(m).slice(0,2) + 'h', MARGIN_L, y + 1);
     }
 
     DOW_NAMES.forEach((name, dayIdx) => {
       const x = colsStartX + dayIdx*(colW + COL_GAP);
 
       doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.setTextColor(40,30,20);
-      doc.text(name.slice(0,3), x, 28);
+      doc.text(name.slice(0,3), x, 24);
       doc.setFont(undefined, 'normal'); doc.setFontSize(7); doc.setTextColor(130);
-      doc.text(fmtDate(dayDates[dayIdx]), x, 31.5);
+      doc.text(fmtDate(dayDates[dayIdx]), x, 27.5);
+
+      // Etiquetas Barra/Cocina
+      doc.setFontSize(5.6); doc.setFont(undefined, 'bold');
+      doc.setTextColor(91,143,174); doc.text('BARRA', x + colW*0.25, 31, {align:'center'});
+      doc.setTextColor(193,131,74); doc.text('COCINA', x + colW*0.75, 31, {align:'center'});
 
       doc.setFillColor(250,247,242);
       doc.rect(x, TIMELINE_TOP, colW, TIMELINE_H, 'F');
+      doc.setDrawColor(235,227,213); doc.setLineWidth(0.12);
+      doc.line(x + colW/2, TIMELINE_TOP, x + colW/2, TIMELINE_TOP + TIMELINE_H);
 
-      const {items, laneCount} = layoutDayShifts(weekKey, dayIdx);
-      items.forEach(({s, emp, startMin, endMin, lane}) => {
-        const blockW = colW / laneCount;
-        const bx = x + lane*blockW;
-        const by = TIMELINE_TOP + startMin*MM_PER_MIN;
-        const bh = Math.max((endMin - startMin)*MM_PER_MIN, 8);
-        const [r,g,b] = hexToRgb(colorForEmployee(emp.id));
+      const drawSide = (layout, type, sideOffsetFrac) => {
+        layout.items.forEach(({s, emp, startMin, endMin, lane}) => {
+          const blockW = (colW/2) / layout.laneCount;
+          const bx = x + sideOffsetFrac*colW + lane*blockW;
+          const by = TIMELINE_TOP + startMin*MM_PER_MIN;
+          const bh = Math.max((endMin - startMin)*MM_PER_MIN, 8);
+          const [r,g,b] = hexToRgb(colorForEmployee(emp.id));
 
-        doc.setFillColor(r,g,b);
-        doc.roundedRect(bx+0.4, by+0.4, blockW-0.8, bh-0.8, 0.8, 0.8, 'F');
+          doc.setFillColor(r,g,b);
+          doc.roundedRect(bx+0.3, by+0.3, blockW-0.6, bh-0.6, 0.6, 0.6, 'F');
 
-        const roleRgb = emp.type === 'cocina' ? [193,131,74] : [91,143,174];
-        doc.setFillColor(roleRgb[0], roleRgb[1], roleRgb[2]);
-        doc.rect(bx+0.4, by+0.4, 1, bh-0.8, 'F');
+          const roleRgb = type === 'cocina' ? [193,131,74] : [91,143,174];
+          doc.setFillColor(roleRgb[0], roleRgb[1], roleRgb[2]);
+          doc.rect(bx+0.3, by+0.3, 0.8, bh-0.6, 'F');
 
-        doc.setTextColor(20,14,10); doc.setFontSize(6.6); doc.setFont(undefined, 'bold');
-        doc.text(emp.name, bx+2, by+3);
-        doc.setFont(undefined, 'normal'); doc.setFontSize(5.8);
-        const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
-        doc.text(`${s.start}–${endLabel}`, bx+2, by+6.2);
-      });
+          const small = blockW < 14;
+          doc.setTextColor(20,14,10); doc.setFontSize(small ? 5.2 : 6.2); doc.setFont(undefined, 'bold');
+          doc.text(emp.name, bx+1.7, by+2.8, {maxWidth: blockW-2.2});
+          if(!small){
+            doc.setFont(undefined, 'normal'); doc.setFontSize(5.4);
+            const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
+            doc.text(`${s.start}–${endLabel}`, bx+1.7, by+5.8);
+          }
+        });
+      };
+
+      drawSide(layoutDayShiftsByType(weekKey, dayIdx, 'barra'), 'barra', 0);
+      drawSide(layoutDayShiftsByType(weekKey, dayIdx, 'cocina'), 'cocina', 0.5);
     });
 
     // Leyenda
@@ -1039,9 +1091,7 @@
     const delId = ev.target.closest('[data-del]')?.dataset.del;
     if(punchId){
       const open = openEntryFor(punchId);
-      if(open){ open.clockOut = new Date().toISOString(); }
-      else{ entries.push({id:uid(), employeeId:punchId, clockIn:new Date().toISOString(), clockOut:null, source:'auto'}); }
-      await saveEntries(); renderAll();
+      openPunchModal(punchId, open ? 'out' : 'in');
     }
     if(editId) openEmployeeModal(editId);
     if(delId){
@@ -1054,6 +1104,53 @@
         renderAll();
       }
     }
+  });
+
+  function nearestQuarter(date){
+    const d = new Date(date);
+    const mins = d.getMinutes();
+    let rounded = Math.round(mins / 15) * 15;
+    d.setSeconds(0,0);
+    if(rounded === 60){ d.setHours(d.getHours()+1); rounded = 0; }
+    d.setMinutes(rounded);
+    return d;
+  }
+
+  function openPunchModal(empId, mode){
+    punchingEmployeeId = empId;
+    punchingMode = mode;
+    const emp = employees.find(e => e.id === empId);
+    $('#punchModalTitle').textContent = `${mode === 'in' ? 'Fichar entrada' : 'Fichar salida'} · ${emp ? emp.name : ''}`;
+    const now = nearestQuarter(new Date());
+    $('#punchTime').value = pad(now.getHours()) + ':' + pad(now.getMinutes());
+    $('#punchModalBackdrop').classList.add('open');
+  }
+  function closePunchModal(){ $('#punchModalBackdrop').classList.remove('open'); punchingEmployeeId = null; punchingMode = null; }
+
+  $('#cancelPunchBtn').addEventListener('click', closePunchModal);
+  $('#punchModalBackdrop').addEventListener('click', (ev) => { if(ev.target.id === 'punchModalBackdrop') closePunchModal(); });
+
+  $('#confirmPunchBtn').addEventListener('click', async () => {
+    const time = $('#punchTime').value;
+    const empId = punchingEmployeeId;
+    const mode = punchingMode;
+    if(!empId || !time) { closePunchModal(); return; }
+    const [h,m] = time.split(':').map(Number);
+    const chosen = new Date(); chosen.setHours(h, m, 0, 0);
+
+    if(mode === 'in'){
+      entries.push({id:uid(), employeeId:empId, clockIn:chosen.toISOString(), clockOut:null, source:'auto'});
+    } else {
+      const open = openEntryFor(empId);
+      if(open){
+        let out = new Date(chosen);
+        if(out <= new Date(open.clockIn)) out.setDate(out.getDate() + 1); // turno que cruza la medianoche
+        open.clockOut = out.toISOString();
+      }
+    }
+    await saveEntries();
+    closePunchModal();
+    renderAll();
   });
 
   document.querySelectorAll('#view-fichar .chip').forEach(chip => {
@@ -1326,7 +1423,7 @@
       const val = pad(Math.floor(m/60)) + ':' + pad(m%60);
       opts += `<option value="${val}">${val}</option>`;
     }
-    ['turnoStart','turnoEnd','manualStart','manualEnd'].forEach(id => { $('#'+id).innerHTML = opts; });
+    ['turnoStart','turnoEnd','manualStart','manualEnd','punchTime'].forEach(id => { $('#'+id).innerHTML = opts; });
   }
   populateTimeSelects();
 
