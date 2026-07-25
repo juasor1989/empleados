@@ -1436,9 +1436,7 @@
     if(delId){
       entries = entries.filter(e => e.id !== delId);
       renderDayEntriesList();
-      renderCalendarGrid();
-      renderSummary();
-      renderDailyCostChart();
+      renderAll();
       saveEntries();
     }
   });
@@ -1476,7 +1474,7 @@
       const newOut = new Date(newIn.getTime() + durMs);
       entries.push({id:uid(), employeeId:e.employeeId, clockIn:newIn.toISOString(), clockOut:newOut.toISOString(), source:'manual'});
     });
-    renderDayEntriesList(); renderCalendarGrid(); renderSummary(); renderDailyCostChart();
+    renderDayEntriesList(); renderAll();
     saveEntries();
   });
 
@@ -1496,7 +1494,7 @@
       if(clockOut <= clockIn) clockOut.setDate(clockOut.getDate() + 1);
       entries.push({id:uid(), employeeId:s.employeeId, clockIn:clockIn.toISOString(), clockOut:clockOut.toISOString(), source:'manual'});
     });
-    renderDayEntriesList(); renderCalendarGrid(); renderSummary(); renderDailyCostChart();
+    renderDayEntriesList(); renderAll();
     saveEntries();
     if(skipped > 0) alert(`${skipped} turno(s) "hasta el cierre" no se importaron automáticamente — añade su hora real de salida a mano.`);
   });
@@ -1532,9 +1530,7 @@
     });
 
     renderDayEntriesList();
-    renderCalendarGrid();
-    renderSummary();
-    renderDailyCostChart();
+    renderAll();
     saveEntries();
   });
 
