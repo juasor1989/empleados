@@ -295,6 +295,11 @@
         <span><span class="swatch-stripe cocina"></span>Cocina</span>
       </div>
       <div class="days-row timeline-row" id="scheduleGrid"></div>
+
+      <div class="section-title" style="margin-top:26px;">
+        <h2>Total semanal por empleado</h2>
+      </div>
+      <div id="weeklyTotalsWrap"></div>
     </div>
 
     <!-- CALENDARIO -->
@@ -727,9 +732,9 @@
   const DOW_NAMES = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
   // Rango visible del timeline: 06:00 a 04:00 del día siguiente (22 horas)
-  const TL_START_MIN = 6 * 60;
-  const TL_TOTAL_MIN = 22 * 60;
-  const TL_PX_PER_MIN = 0.48; // ~29px por hora
+  const TL_START_MIN = 11 * 60; // 11:00
+  const TL_TOTAL_MIN = 14 * 60; // hasta las 01:00
+  const TL_PX_PER_MIN = 0.62; // ~37px por hora
 
   function toRangeMinutes(timeStr){
     const [h,m] = timeStr.split(':').map(Number);
@@ -754,15 +759,21 @@
         return {s, emp, startMin, endMin};
       })
       .filter(Boolean);
-    const sorted = [...dayShifts].sort((a,b) => a.startMin - b.startMin);
-    const laneEnds = [];
-    sorted.forEach(item => {
-      let lane = laneEnds.findIndex(end => end <= item.startMin);
-      if(lane === -1){ lane = laneEnds.length; laneEnds.push(item.endMin); }
-      else laneEnds[lane] = item.endMin;
-      item.lane = lane;
+
+    // Un carril fijo por empleado (no se reutiliza para otro trabajador aunque quede libre),
+    // así los turnos partidos de una misma persona quedan siempre en su misma columna.
+    const empOrder = [];
+    dayShifts.forEach(item => { if(!empOrder.includes(item.emp.id)) empOrder.push(item.emp.id); });
+    empOrder.sort((a,b) => {
+      const aMin = Math.min(...dayShifts.filter(x => x.emp.id === a).map(x => x.startMin));
+      const bMin = Math.min(...dayShifts.filter(x => x.emp.id === b).map(x => x.startMin));
+      return aMin - bMin;
     });
-    return {items:sorted, laneCount:Math.max(laneEnds.length,1)};
+    const laneMap = {};
+    empOrder.forEach((id, idx) => { laneMap[id] = idx; });
+    dayShifts.forEach(item => { item.lane = laneMap[item.emp.id]; });
+
+    return {items:dayShifts, laneCount:Math.max(empOrder.length,1)};
   }
 
   function fontScaleForFraction(frac){
@@ -796,6 +807,45 @@
     `).join('');
   }
 
+  function computeWeeklyScheduledHours(){
+    const weekKey = isoDate(currentWeekStart);
+    const totals = {};
+    employees.forEach(e => { totals[e.id] = {minutes:0, cierreCount:0}; });
+    schedule.filter(s => s.weekStart === weekKey).forEach(s => {
+      if(!totals[s.employeeId]) return;
+      if(s.end === 'cierre'){ totals[s.employeeId].cierreCount++; return; }
+      const startMin = toRangeMinutes(s.start);
+      const endMin = toRangeMinutes(s.end);
+      const dur = endMin > startMin ? (endMin - startMin) : (endMin + 24*60 - startMin);
+      totals[s.employeeId].minutes += dur;
+    });
+    return totals;
+  }
+
+  function renderWeeklyTotals(){
+    const wrap = $('#weeklyTotalsWrap');
+    if(employees.length === 0){ wrap.innerHTML = ''; return; }
+    const totals = computeWeeklyScheduledHours();
+    const rows = employees.map(e => {
+      const t = totals[e.id];
+      const hours = (t.minutes / 60);
+      const hoursTxt = hours > 0 ? hours.toFixed(1).replace(/\.0$/,'') + ' h' : '—';
+      const cierreTxt = t.cierreCount > 0 ? ` <span class="tag">+${t.cierreCount} hasta cierre</span>` : '';
+      return `
+        <tr>
+          <td><span class="legend-swatch" style="background:${colorForEmployee(e.id)}; margin-right:6px;"></span>${escapeHtml(e.name)} <span class="badge ${e.type}">${e.type === 'cocina' ? 'Coc' : 'Bar'}</span></td>
+          <td class="num">${hoursTxt}${cierreTxt}</td>
+        </tr>`;
+    }).join('');
+    const grandMinutes = Object.values(totals).reduce((s,t) => s + t.minutes, 0);
+    wrap.innerHTML = `
+      <table>
+        <thead><tr><th>Empleado</th><th class="num">Horas planificadas</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>Total plantilla</td><td class="num">${(grandMinutes/60).toFixed(1).replace(/\.0$/,'')} h</td></tr></tfoot>
+      </table>`;
+  }
+
   function renderScheduleGrid(){
     const wrap = $('#scheduleGrid');
     const weekKey = isoDate(currentWeekStart);
@@ -810,6 +860,11 @@
     const hourMarks = [];
     for(let m = 0; m <= TL_TOTAL_MIN; m += 60) hourMarks.push(m);
 
+    function fmtHoursShort(mins){
+      const h = mins / 60;
+      return (Number.isInteger(h) ? h : h.toFixed(1)) + 'h';
+    }
+
     function blocksForType(layout, type, sideOffsetPct, sideWidthPct){
       return layout.items.map(({s, emp, startMin, endMin, lane}) => {
         const top = startMin * TL_PX_PER_MIN;
@@ -818,14 +873,17 @@
         const leftPct = sideOffsetPct + lane * widthPct;
         const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
         const scale = fontScaleForFraction(widthPct / 100);
-        const showTime = (widthPct / 100) >= 0.20;
+        const frac = widthPct / 100;
+        const showTime = frac >= 0.20;
+        const showDuration = frac >= 0.30 && s.end !== 'cierre';
+        const durationTxt = showDuration ? ` · ${fmtHoursShort(endMin - startMin)}` : '';
         return `
           <div class="tl-block ${type} ${s.end === 'cierre' ? 'cierre' : ''}" data-edit-turno="${s.id}"
                style="top:${top}px; height:${height}px; left:calc(${leftPct}% + 1.5px); width:calc(${widthPct}% - 3px); background:${colorForEmployee(emp.id)}; font-size:${(10*scale).toFixed(1)}px;"
                title="${escapeHtml(emp.name)} · ${s.start}–${endLabel}">
             <button class="tl-del" data-del-turno="${s.id}" title="Eliminar">✕</button>
             <span class="tl-name">${escapeHtml(emp.name)}</span>
-            ${showTime ? `<span class="tl-time">${s.start}–${endLabel}</span>` : ''}
+            ${showTime ? `<span class="tl-time">${s.start}–${endLabel}${durationTxt}</span>` : ''}
           </div>`;
       }).join('');
     }
@@ -882,74 +940,84 @@
   async function exportScheduleToPdf(){
     if(employees.length === 0){ alert('Añade empleados y turnos antes de exportar.'); return; }
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+    const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a3'});
     const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
     const dayDates = scheduleDayDates();
     const weekEnd = dayDates[6];
     const weekKey = isoDate(currentWeekStart);
 
-    const MARGIN_L = 12, MARGIN_R = 8, GUTTER = 9, COL_GAP = 1.5;
-    const TIMELINE_TOP = 33, TIMELINE_H = 152;
+    const MARGIN_L = 11, MARGIN_R = 9, DAY_GUTTER = 7.5, DAY_GAP = 3;
+    const TIMELINE_TOP = 32, TIMELINE_H = 188;
     const MM_PER_MIN = TIMELINE_H / TL_TOTAL_MIN;
 
-    doc.setFont(undefined, 'bold'); doc.setFontSize(15); doc.setTextColor(30,20,12);
-    doc.text('Horario · La Sede', MARGIN_L, 13);
-    doc.setFont(undefined, 'normal'); doc.setFontSize(9.5); doc.setTextColor(120);
-    doc.text(`Semana del ${fmtDate(currentWeekStart)} al ${fmtDate(weekEnd)}`, MARGIN_L, 19);
+    doc.setFont(undefined, 'bold'); doc.setFontSize(18); doc.setTextColor(30,20,12);
+    doc.text('Horario · La Sede', MARGIN_L, 14);
+    doc.setFont(undefined, 'normal'); doc.setFontSize(11); doc.setTextColor(120);
+    doc.text(`Semana del ${fmtDate(currentWeekStart)} al ${fmtDate(weekEnd)}`, MARGIN_L, 21);
 
-    const usableW = pageW - MARGIN_L - MARGIN_R - GUTTER;
-    const colW = (usableW - 6*COL_GAP) / 7;
-    const colsStartX = MARGIN_L + GUTTER;
-
-    // Líneas horarias cada hora
-    doc.setDrawColor(224,213,196); doc.setLineWidth(0.12);
-    for(let m = 0; m <= TL_TOTAL_MIN; m += 60){
-      const y = TIMELINE_TOP + m*MM_PER_MIN;
-      doc.line(colsStartX, y, colsStartX + 7*colW + 6*COL_GAP, y);
-      doc.setFontSize(5.8); doc.setTextColor(150);
-      doc.text(rangeMinutesToTime(m).slice(0,2) + 'h', MARGIN_L, y + 1);
-    }
+    const usableW = pageW - MARGIN_L - MARGIN_R;
+    const unitW = (usableW - 6*DAY_GAP) / 7; // gutter + block area, por día
+    const blockAreaW = unitW - DAY_GUTTER;
 
     DOW_NAMES.forEach((name, dayIdx) => {
-      const x = colsStartX + dayIdx*(colW + COL_GAP);
+      const unitX = MARGIN_L + dayIdx*(unitW + DAY_GAP);
+      const gutterX = unitX;
+      const blockX = unitX + DAY_GUTTER;
 
-      doc.setFont(undefined, 'bold'); doc.setFontSize(9); doc.setTextColor(40,30,20);
-      doc.text(name.slice(0,3), x, 24);
-      doc.setFont(undefined, 'normal'); doc.setFontSize(7); doc.setTextColor(130);
-      doc.text(fmtDate(dayDates[dayIdx]), x, 27.5);
+      // Cabecera del día
+      doc.setFont(undefined, 'bold'); doc.setFontSize(11); doc.setTextColor(40,30,20);
+      doc.text(name, blockX, 23);
+      doc.setFont(undefined, 'normal'); doc.setFontSize(8.5); doc.setTextColor(130);
+      doc.text(fmtDate(dayDates[dayIdx]), blockX, 27);
 
       // Etiquetas Barra/Cocina
-      doc.setFontSize(5.6); doc.setFont(undefined, 'bold');
-      doc.setTextColor(91,143,174); doc.text('BARRA', x + colW*0.25, 31, {align:'center'});
-      doc.setTextColor(193,131,74); doc.text('COCINA', x + colW*0.75, 31, {align:'center'});
+      doc.setFontSize(6.2); doc.setFont(undefined, 'bold');
+      doc.setTextColor(91,143,174); doc.text('BARRA', blockX + blockAreaW*0.25, 30.3, {align:'center'});
+      doc.setTextColor(193,131,74); doc.text('COCINA', blockX + blockAreaW*0.75, 30.3, {align:'center'});
 
+      // Fondo del área de turnos
       doc.setFillColor(250,247,242);
-      doc.rect(x, TIMELINE_TOP, colW, TIMELINE_H, 'F');
+      doc.rect(blockX, TIMELINE_TOP, blockAreaW, TIMELINE_H, 'F');
       doc.setDrawColor(235,227,213); doc.setLineWidth(0.12);
-      doc.line(x + colW/2, TIMELINE_TOP, x + colW/2, TIMELINE_TOP + TIMELINE_H);
+      doc.line(blockX + blockAreaW/2, TIMELINE_TOP, blockX + blockAreaW/2, TIMELINE_TOP + TIMELINE_H);
+
+      // Horas repetidas en cada día (gutter propio + líneas dentro del área)
+      doc.setDrawColor(224,213,196); doc.setLineWidth(0.12);
+      for(let m = 0; m <= TL_TOTAL_MIN; m += 60){
+        const y = TIMELINE_TOP + m*MM_PER_MIN;
+        doc.line(blockX, y, blockX + blockAreaW, y);
+        doc.setFontSize(6); doc.setTextColor(140);
+        doc.text(rangeMinutesToTime(m).slice(0,2) + 'h', gutterX, y + 1.1);
+      }
 
       const drawSide = (layout, type, sideOffsetFrac) => {
         layout.items.forEach(({s, emp, startMin, endMin, lane}) => {
-          const blockW = (colW/2) / layout.laneCount;
-          const bx = x + sideOffsetFrac*colW + lane*blockW;
+          const blockW = (blockAreaW/2) / layout.laneCount;
+          const bx = blockX + sideOffsetFrac*blockAreaW + lane*blockW;
           const by = TIMELINE_TOP + startMin*MM_PER_MIN;
-          const bh = Math.max((endMin - startMin)*MM_PER_MIN, 8);
+          const bh = Math.max((endMin - startMin)*MM_PER_MIN, 9);
           const [r,g,b] = hexToRgb(colorForEmployee(emp.id));
 
           doc.setFillColor(r,g,b);
-          doc.roundedRect(bx+0.3, by+0.3, blockW-0.6, bh-0.6, 0.6, 0.6, 'F');
+          doc.roundedRect(bx+0.35, by+0.35, blockW-0.7, bh-0.7, 0.7, 0.7, 'F');
 
           const roleRgb = type === 'cocina' ? [193,131,74] : [91,143,174];
           doc.setFillColor(roleRgb[0], roleRgb[1], roleRgb[2]);
-          doc.rect(bx+0.3, by+0.3, 0.8, bh-0.6, 'F');
+          doc.rect(bx+0.35, by+0.35, 1, bh-0.7, 'F');
 
-          const small = blockW < 14;
-          doc.setTextColor(20,14,10); doc.setFontSize(small ? 5.2 : 6.2); doc.setFont(undefined, 'bold');
-          doc.text(emp.name, bx+1.7, by+2.8, {maxWidth: blockW-2.2});
-          if(!small){
-            doc.setFont(undefined, 'normal'); doc.setFontSize(5.4);
-            const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
-            doc.text(`${s.start}–${endLabel}`, bx+1.7, by+5.8);
+          const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
+          const durTxt = s.end !== 'cierre' ? ` (${(endMin-startMin)/60 === Math.round((endMin-startMin)/60) ? Math.round((endMin-startMin)/60) : ((endMin-startMin)/60).toFixed(1)}h)` : '';
+          const small = blockW < 15;
+          doc.setTextColor(20,14,10); doc.setFontSize(small ? 6 : 7.2); doc.setFont(undefined, 'bold');
+          doc.text(emp.name, bx+2, by+3.4, {maxWidth: blockW-2.6});
+          if(!small && bh > 10){
+            doc.setFont(undefined, 'normal'); doc.setFontSize(6.2);
+            doc.text(`${s.start}–${endLabel}`, bx+2, by+6.6);
+            if(bh > 13.5) doc.text(durTxt.replace(/[()]/g,''), bx+2, by+9.6);
+          } else if(!small){
+            doc.setFont(undefined, 'normal'); doc.setFontSize(5.8);
+            doc.text(`${s.start}–${endLabel}`, bx+2, by+6.4);
           }
         });
       };
@@ -958,18 +1026,38 @@
       drawSide(layoutDayShiftsByType(weekKey, dayIdx, 'cocina'), 'cocina', 0.5);
     });
 
-    // Leyenda
-    let ly = TIMELINE_TOP + TIMELINE_H + 9;
+    // Leyenda de empleados
+    let ly = TIMELINE_TOP + TIMELINE_H + 11;
     let lx = MARGIN_L;
-    doc.setFontSize(7.5);
+    doc.setFontSize(8.5);
     employees.forEach(emp => {
       const [r,g,b] = hexToRgb(colorForEmployee(emp.id));
-      doc.setFillColor(r,g,b); doc.rect(lx, ly-3, 3, 3, 'F');
+      doc.setFillColor(r,g,b); doc.rect(lx, ly-3, 3.4, 3.4, 'F');
       const label = `${emp.name} (${emp.type === 'cocina' ? 'Cocina' : 'Barra'})`;
       doc.setTextColor(70); doc.setFont(undefined, 'normal');
-      doc.text(label, lx+4.5, ly);
-      lx += doc.getTextWidth(label) + 12;
-      if(lx > pageW - 45){ lx = MARGIN_L; ly += 6; }
+      doc.text(label, lx+5, ly);
+      lx += doc.getTextWidth(label) + 14;
+      if(lx > pageW - 60){ lx = MARGIN_L; ly += 7; }
+    });
+
+    // Total semanal por empleado
+    ly += 11;
+    doc.setFont(undefined, 'bold'); doc.setFontSize(10.5); doc.setTextColor(40,30,20);
+    doc.text('Total semanal por empleado', MARGIN_L, ly);
+    ly += 6;
+    const totals = computeWeeklyScheduledHours();
+    let tx = MARGIN_L;
+    doc.setFontSize(8.5);
+    employees.forEach(emp => {
+      const t = totals[emp.id];
+      const hours = t.minutes / 60;
+      const hoursTxt = hours > 0 ? (Number.isInteger(hours) ? hours : hours.toFixed(1)) + 'h' : '—';
+      const cierreTxt = t.cierreCount > 0 ? ` +${t.cierreCount} cierre` : '';
+      const label = `${emp.name}: ${hoursTxt}${cierreTxt}`;
+      doc.setFont(undefined, 'normal'); doc.setTextColor(70);
+      doc.text(label, tx, ly);
+      tx += doc.getTextWidth(label) + 14;
+      if(tx > pageW - 60){ tx = MARGIN_L; ly += 6; }
     });
 
     const fileName = `horario-lasede-${isoDate(currentWeekStart)}.pdf`;
@@ -1071,6 +1159,7 @@
     renderScheduleWeekLabel();
     renderScheduleLegend();
     renderScheduleGrid();
+    renderWeeklyTotals();
     renderMonthLabel();
     renderCalendarGrid();
   }
