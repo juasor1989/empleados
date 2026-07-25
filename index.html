@@ -149,8 +149,9 @@
   .tl-side-labels .cocina{color:var(--cocina);}
   .timeline-gridline{position:absolute; left:0; right:0; border-top:1px solid var(--line);}
   .tl-block{
-    position:absolute; border-radius:5px; padding:4px 6px 4px 11px; font-size:10.5px; line-height:1.3; overflow:hidden;
+    position:absolute; border-radius:5px; padding:4px 3px 4px 9px; font-size:9.5px; overflow:hidden;
     cursor:pointer; color:#17130f; box-shadow:0 1px 3px rgba(0,0,0,.35); border:1px solid rgba(0,0,0,.15);
+    display:flex; align-items:center; justify-content:center;
   }
   .tl-block::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:6px;
@@ -158,11 +159,13 @@
   .tl-block.barra::before{background:repeating-linear-gradient(135deg, var(--barra), var(--barra) 3px, #1c140d 3px, #1c140d 4px);}
   .tl-block.cocina::before{background:repeating-linear-gradient(45deg, var(--cocina), var(--cocina) 3px, #1c140d 3px, #1c140d 4px);}
   .tl-block.cierre{-webkit-mask-image:linear-gradient(180deg, #000 60%, transparent 100%); mask-image:linear-gradient(180deg, #000 60%, transparent 100%);}
-  .tl-block .tl-name{display:block; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .tl-block .tl-time{display:block; font-family:'IBM Plex Mono',monospace; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
+  .tl-block .tl-name{
+    writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg);
+    font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-height:100%;
+  }
   .tl-del{
     position:absolute; top:1px; right:2px; background:none; border:none; color:#17130f; opacity:.5;
-    font-size:10px; cursor:pointer; padding:2px;
+    font-size:10px; cursor:pointer; padding:2px; writing-mode:horizontal-tb;
   }
   .tl-del:hover{opacity:1;}
   .empty-slot{font-size:11.5px; color:var(--muted); padding:2px 0 10px;}
@@ -776,13 +779,6 @@
     return {items:dayShifts, laneCount:Math.max(empOrder.length,1)};
   }
 
-  function fontScaleForFraction(frac){
-    if(frac >= 0.42) return 1;
-    if(frac >= 0.30) return 0.86;
-    if(frac >= 0.22) return 0.74;
-    return 0.62;
-  }
-
   function hexToRgb(hex){
     const h = hex.replace('#','');
     const full = h.length === 3 ? h.split('').map(c => c+c).join('') : h;
@@ -822,27 +818,46 @@
     return totals;
   }
 
+  function computeWeeklyPay(totals){
+    const pay = {};
+    employees.forEach(e => {
+      const t = totals[e.id] || {minutes:0, cierreCount:0};
+      const hours = t.minutes / 60;
+      if(e.rateType === 'hourly'){
+        pay[e.id] = {amount: hours * e.rate, fixed:false};
+      } else {
+        pay[e.id] = {amount: e.rate / 4.345, fixed:true};
+      }
+    });
+    return pay;
+  }
+
   function renderWeeklyTotals(){
     const wrap = $('#weeklyTotalsWrap');
     if(employees.length === 0){ wrap.innerHTML = ''; return; }
     const totals = computeWeeklyScheduledHours();
+    const pay = computeWeeklyPay(totals);
     const rows = employees.map(e => {
       const t = totals[e.id];
       const hours = (t.minutes / 60);
       const hoursTxt = hours > 0 ? hours.toFixed(1).replace(/\.0$/,'') + ' h' : '—';
       const cierreTxt = t.cierreCount > 0 ? ` <span class="tag">+${t.cierreCount} hasta cierre</span>` : '';
+      const p = pay[e.id];
+      const payTxt = p.fixed ? `${p.amount.toFixed(2)} €<span class="tag" style="margin-left:6px;">fijo · aprox.</span>` : `${p.amount.toFixed(2)} €`;
       return `
         <tr>
           <td><span class="legend-swatch" style="background:${colorForEmployee(e.id)}; margin-right:6px;"></span>${escapeHtml(e.name)} <span class="badge ${e.type}">${e.type === 'cocina' ? 'Coc' : 'Bar'}</span></td>
           <td class="num">${hoursTxt}${cierreTxt}</td>
+          <td class="num">${payTxt}</td>
         </tr>`;
     }).join('');
     const grandMinutes = Object.values(totals).reduce((s,t) => s + t.minutes, 0);
+    const grandPay = Object.values(pay).reduce((s,p) => s + p.amount, 0);
     wrap.innerHTML = `
       <table>
-        <thead><tr><th>Empleado</th><th class="num">Horas planificadas</th></tr></thead>
+        <thead><tr><th>Empleado</th><th class="num">Horas planificadas</th><th class="num">Pago estimado semana</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td>Total plantilla</td><td class="num">${(grandMinutes/60).toFixed(1).replace(/\.0$/,'')} h</td></tr></tfoot>
+        <tfoot><tr><td>Total plantilla</td><td class="num">${(grandMinutes/60).toFixed(1).replace(/\.0$/,'')} h</td><td class="num">${grandPay.toFixed(2)} €</td></tr></tfoot>
       </table>`;
   }
 
@@ -860,11 +875,6 @@
     const hourMarks = [];
     for(let m = 0; m <= TL_TOTAL_MIN; m += 60) hourMarks.push(m);
 
-    function fmtHoursShort(mins){
-      const h = mins / 60;
-      return (Number.isInteger(h) ? h : h.toFixed(1)) + 'h';
-    }
-
     function blocksForType(layout, type, sideOffsetPct, sideWidthPct){
       return layout.items.map(({s, emp, startMin, endMin, lane}) => {
         const top = startMin * TL_PX_PER_MIN;
@@ -872,18 +882,12 @@
         const widthPct = sideWidthPct / layout.laneCount;
         const leftPct = sideOffsetPct + lane * widthPct;
         const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
-        const scale = fontScaleForFraction(widthPct / 100);
-        const frac = widthPct / 100;
-        const showTime = frac >= 0.20;
-        const showDuration = frac >= 0.30 && s.end !== 'cierre';
-        const durationTxt = showDuration ? ` · ${fmtHoursShort(endMin - startMin)}` : '';
         return `
           <div class="tl-block ${type} ${s.end === 'cierre' ? 'cierre' : ''}" data-edit-turno="${s.id}"
-               style="top:${top}px; height:${height}px; left:calc(${leftPct}% + 1.5px); width:calc(${widthPct}% - 3px); background:${colorForEmployee(emp.id)}; font-size:${(10*scale).toFixed(1)}px;"
+               style="top:${top}px; height:${height}px; left:calc(${leftPct}% + 1.5px); width:calc(${widthPct}% - 3px); background:${colorForEmployee(emp.id)};"
                title="${escapeHtml(emp.name)} · ${s.start}–${endLabel}">
             <button class="tl-del" data-del-turno="${s.id}" title="Eliminar">✕</button>
             <span class="tl-name">${escapeHtml(emp.name)}</span>
-            ${showTime ? `<span class="tl-time">${s.start}–${endLabel}${durationTxt}</span>` : ''}
           </div>`;
       }).join('');
     }
@@ -1006,19 +1010,8 @@
           doc.setFillColor(roleRgb[0], roleRgb[1], roleRgb[2]);
           doc.rect(bx+0.35, by+0.35, 1, bh-0.7, 'F');
 
-          const endLabel = s.end === 'cierre' ? 'Cierre' : s.end;
-          const durTxt = s.end !== 'cierre' ? ` (${(endMin-startMin)/60 === Math.round((endMin-startMin)/60) ? Math.round((endMin-startMin)/60) : ((endMin-startMin)/60).toFixed(1)}h)` : '';
-          const small = blockW < 15;
-          doc.setTextColor(20,14,10); doc.setFontSize(small ? 6 : 7.2); doc.setFont(undefined, 'bold');
-          doc.text(emp.name, bx+2, by+3.4, {maxWidth: blockW-2.6});
-          if(!small && bh > 10){
-            doc.setFont(undefined, 'normal'); doc.setFontSize(6.2);
-            doc.text(`${s.start}–${endLabel}`, bx+2, by+6.6);
-            if(bh > 13.5) doc.text(durTxt.replace(/[()]/g,''), bx+2, by+9.6);
-          } else if(!small){
-            doc.setFont(undefined, 'normal'); doc.setFontSize(5.8);
-            doc.text(`${s.start}–${endLabel}`, bx+2, by+6.4);
-          }
+          doc.setTextColor(20,14,10); doc.setFontSize(7.4); doc.setFont(undefined, 'bold');
+          doc.text(emp.name, bx + blockW/2 + 0.6, by + bh - 1.5, {angle:90});
         });
       };
 
@@ -1043,21 +1036,23 @@
     // Total semanal por empleado
     ly += 11;
     doc.setFont(undefined, 'bold'); doc.setFontSize(10.5); doc.setTextColor(40,30,20);
-    doc.text('Total semanal por empleado', MARGIN_L, ly);
+    doc.text('Total semanal y pago estimado por empleado', MARGIN_L, ly);
     ly += 6;
     const totals = computeWeeklyScheduledHours();
-    let tx = MARGIN_L;
+    const pay = computeWeeklyPay(totals);
     doc.setFontSize(8.5);
     employees.forEach(emp => {
       const t = totals[emp.id];
       const hours = t.minutes / 60;
       const hoursTxt = hours > 0 ? (Number.isInteger(hours) ? hours : hours.toFixed(1)) + 'h' : '—';
       const cierreTxt = t.cierreCount > 0 ? ` +${t.cierreCount} cierre` : '';
-      const label = `${emp.name}: ${hoursTxt}${cierreTxt}`;
+      const p = pay[emp.id];
+      const payTxt = `${p.amount.toFixed(2)}€${p.fixed ? ' fijo aprox.' : ''}`;
+      const label = `${emp.name}: ${hoursTxt}${cierreTxt} · ${payTxt}`;
       doc.setFont(undefined, 'normal'); doc.setTextColor(70);
-      doc.text(label, tx, ly);
-      tx += doc.getTextWidth(label) + 14;
-      if(tx > pageW - 60){ tx = MARGIN_L; ly += 6; }
+      doc.text(label, MARGIN_L, ly);
+      ly += 5.5;
+      if(ly > pageH - 8){ ly = TIMELINE_TOP; } // margen de seguridad, no debería ocurrir con <=10 empleados
     });
 
     const fileName = `horario-lasede-${isoDate(currentWeekStart)}.pdf`;
