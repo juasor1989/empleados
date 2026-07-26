@@ -1035,13 +1035,6 @@
         doc.text(rangeMinutesToTime(m).slice(0,2) + 'h', gutterX, y + 1.1);
       }
 
-      function truncateToWidth(text, maxWidth){
-        if(doc.getTextWidth(text) <= maxWidth) return text;
-        let t = text;
-        while(t.length > 1 && doc.getTextWidth(t + '…') > maxWidth) t = t.slice(0, -1);
-        return t.length > 1 ? t + '…' : t;
-      }
-
       const drawSide = (layout, type, sideOffsetFrac) => {
         layout.items.forEach(({s, emp, startMin, endMin, lane}) => {
           const blockW = (blockAreaW/2) / layout.laneCount;
@@ -1057,9 +1050,8 @@
           doc.setFillColor(roleRgb[0], roleRgb[1], roleRgb[2]);
           doc.rect(bx+0.35, by+0.35, 1, bh-0.7, 'F');
 
-          doc.setTextColor(20,14,10); doc.setFontSize(6.6); doc.setFont(undefined, 'bold');
-          const label = truncateToWidth(emp.name, blockW - 2.4);
-          doc.text(label, bx + 2, by + Math.min(4.2, bh - 1.5));
+          doc.setTextColor(20,14,10); doc.setFontSize(7.4); doc.setFont(undefined, 'bold');
+          doc.text(emp.name, bx + blockW/2 + 0.6, by + bh - 1.5, {angle:90});
         });
       };
 
