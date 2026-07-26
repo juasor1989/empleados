@@ -131,7 +131,10 @@
   th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; padding:10px 12px; border-bottom:1px solid var(--line);}
   td{padding:12px; border-bottom:1px solid var(--line);}
   tr:last-child td{border-bottom:none;}
-  td.num, th.num{text-align:right; font-family:'IBM Plex Mono',monospace;}
+  td.num, th.num{text-align:right; font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
+  .table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .table-scroll table{min-width:480px;}
+  td, th{white-space:nowrap;}
   tfoot td{font-weight:600; border-top:1px solid var(--line); border-bottom:none; padding-top:14px;}
   .tag{font-size:10.5px; padding:2px 7px; border-radius:10px; background:var(--surface-2); color:var(--muted); white-space:nowrap; display:inline-block;}
 
@@ -278,7 +281,7 @@
           <button class="chip" data-period="mes">Mes</button>
         </div>
       </div>
-      <div id="summaryWrap"></div>
+      <div id="summaryWrap" class="table-scroll"></div>
 
       <div class="section-title" style="margin-top:30px;">
         <h2>Gasto por día</h2>
@@ -312,7 +315,7 @@
       <div class="section-title" style="margin-top:26px;">
         <h2>Total semanal por empleado</h2>
       </div>
-      <div id="weeklyTotalsWrap"></div>
+      <div id="weeklyTotalsWrap" class="table-scroll"></div>
     </div>
 
     <!-- CALENDARIO -->
@@ -892,7 +895,7 @@
     const grandPay = Object.values(pay).reduce((s,p) => s + p.amount, 0);
     wrap.innerHTML = `
       <table>
-        <thead><tr><th>Empleado</th><th class="num">Horas planificadas</th><th class="num">Pago estimado semana</th></tr></thead>
+        <thead><tr><th>Empleado</th><th class="num">Horas</th><th class="num">Pago semana</th></tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td>Total plantilla</td><td class="num">${(grandMinutes/60).toFixed(1).replace(/\.0$/,'')} h</td><td class="num">${grandPay.toFixed(2)} €</td></tr></tfoot>
       </table>`;
@@ -1032,6 +1035,13 @@
         doc.text(rangeMinutesToTime(m).slice(0,2) + 'h', gutterX, y + 1.1);
       }
 
+      function truncateToWidth(text, maxWidth){
+        if(doc.getTextWidth(text) <= maxWidth) return text;
+        let t = text;
+        while(t.length > 1 && doc.getTextWidth(t + '…') > maxWidth) t = t.slice(0, -1);
+        return t.length > 1 ? t + '…' : t;
+      }
+
       const drawSide = (layout, type, sideOffsetFrac) => {
         layout.items.forEach(({s, emp, startMin, endMin, lane}) => {
           const blockW = (blockAreaW/2) / layout.laneCount;
@@ -1047,8 +1057,9 @@
           doc.setFillColor(roleRgb[0], roleRgb[1], roleRgb[2]);
           doc.rect(bx+0.35, by+0.35, 1, bh-0.7, 'F');
 
-          doc.setTextColor(20,14,10); doc.setFontSize(7.4); doc.setFont(undefined, 'bold');
-          doc.text(emp.name, bx + blockW/2 + 0.6, by + bh - 1.5, {angle:90});
+          doc.setTextColor(20,14,10); doc.setFontSize(6.6); doc.setFont(undefined, 'bold');
+          const label = truncateToWidth(emp.name, blockW - 2.4);
+          doc.text(label, bx + 2, by + Math.min(4.2, bh - 1.5));
         });
       };
 
@@ -1074,9 +1085,10 @@
     ly += 11;
     doc.setFont(undefined, 'bold'); doc.setFontSize(10.5); doc.setTextColor(40,30,20);
     doc.text('Total semanal por empleado', MARGIN_L, ly);
-    ly += 6;
+    ly += 7;
     const totals = computeWeeklyScheduledHours();
     doc.setFontSize(8.5);
+    let tx = MARGIN_L;
     employees.forEach(emp => {
       const t = totals[emp.id];
       const hours = t.minutes / 60;
@@ -1084,9 +1096,9 @@
       const cierreTxt = t.cierreCount > 0 ? ` +${t.cierreCount} cierre` : '';
       const label = `${emp.name}: ${hoursTxt}${cierreTxt}`;
       doc.setFont(undefined, 'normal'); doc.setTextColor(70);
-      doc.text(label, MARGIN_L, ly);
-      ly += 5.5;
-      if(ly > pageH - 8){ ly = TIMELINE_TOP; } // margen de seguridad, no debería ocurrir con <=10 empleados
+      if(tx + doc.getTextWidth(label) > pageW - MARGIN_R){ tx = MARGIN_L; ly += 6; }
+      doc.text(label, tx, ly);
+      tx += doc.getTextWidth(label) + 14;
     });
 
     const fileName = `horario-lasede-${isoDate(currentWeekStart)}.pdf`;
