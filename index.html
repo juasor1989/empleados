@@ -32,6 +32,24 @@
   .sync-status{font-size:11px; color:var(--muted); margin-top:4px;}
   .sync-status.error{color:var(--danger);}
 
+  /* Modo tablet / gestión */
+  body.locked .admin-only{display:none !important;}
+  #adminLockBtn{
+    position:fixed; bottom:16px; right:16px; z-index:30;
+    width:40px; height:40px; border-radius:50%; border:1px solid var(--line);
+    background:rgba(34,28,22,.85); backdrop-filter:blur(6px); color:var(--muted);
+    font-size:16px; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.4);
+  }
+  #adminLockBtn:hover{color:var(--copper-bright); border-color:var(--copper);}
+  body.unlocked #adminLockBtn{color:var(--in); border-color:var(--in);}
+  #changePinBtn{
+    position:fixed; bottom:16px; right:64px; z-index:30;
+    width:40px; height:40px; border-radius:50%; border:1px solid var(--line);
+    background:rgba(34,28,22,.85); backdrop-filter:blur(6px); color:var(--muted);
+    font-size:15px; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.4);
+  }
+  #changePinBtn:hover{color:var(--copper-bright); border-color:var(--copper);}
+
   /* Gasto por día */
   .kpi-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:10px; margin-bottom:16px;}
   .kpi-card{
@@ -256,11 +274,14 @@
   </div>
 </header>
 
-<nav class="tabs-main">
+<nav class="tabs-main admin-only">
   <button class="tab-main active" data-tab="fichar">⏱ Fichar</button>
   <button class="tab-main" data-tab="horario">🗓 Horario</button>
   <button class="tab-main" data-tab="calendario">📅 Calendario</button>
 </nav>
+
+<button id="adminLockBtn" title="Modo gestión">🔒</button>
+<button id="changePinBtn" class="admin-only" title="Cambiar código">⚙</button>
 
 <main>
   <div id="loading" class="loading">Cargando datos de la hoja…</div>
@@ -270,25 +291,25 @@
     <div class="view active" id="view-fichar">
       <div class="section-title">
         <h2>Empleados</h2>
-        <button class="btn" id="addEmployeeBtn">+ Añadir empleado</button>
+        <button class="btn admin-only" id="addEmployeeBtn">+ Añadir empleado</button>
       </div>
       <div class="grid" id="employeeGrid"></div>
 
-      <div class="section-title" style="margin-top:34px;">
+      <div class="section-title admin-only" style="margin-top:34px;">
         <h2>Resumen de costes</h2>
         <div class="filters" style="margin:0;">
           <button class="chip" data-period="semana">Semana</button>
           <button class="chip" data-period="mes">Mes</button>
         </div>
       </div>
-      <div id="summaryWrap" class="table-scroll"></div>
+      <div id="summaryWrap" class="table-scroll admin-only"></div>
 
-      <div class="section-title" style="margin-top:30px;">
+      <div class="section-title admin-only" style="margin-top:30px;">
         <h2>Gasto por día</h2>
       </div>
-      <div class="kpi-row" id="kpiWrap"></div>
-      <div id="dailyCostWrap"></div>
-      <div class="cost-note">Solo incluye empleados por hora — los sueldos fijos se reflejan en el total del mes, no día a día.</div>
+      <div class="kpi-row admin-only" id="kpiWrap"></div>
+      <div id="dailyCostWrap" class="admin-only"></div>
+      <div class="cost-note admin-only">Solo incluye empleados por hora — los sueldos fijos se reflejan en el total del mes, no día a día.</div>
     </div>
 
     <!-- HORARIO -->
@@ -367,6 +388,21 @@
     <div class="modal-actions">
       <button class="btn ghost" id="cancelEmpBtn">Cancelar</button>
       <button class="btn" id="saveEmpBtn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Código de modo gestión -->
+<div class="modal-backdrop" id="pinModalBackdrop">
+  <div class="modal">
+    <h3>Modo gestión</h3>
+    <div class="field">
+      <label>Código</label>
+      <input type="password" id="pinInput" inputmode="numeric" placeholder="····">
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="cancelPinBtn">Cancelar</button>
+      <button class="btn" id="submitPinBtn">Entrar</button>
     </div>
   </div>
 </div>
@@ -487,6 +523,7 @@
   const K_EMPLOYEES = 'tc_employees';
   const K_ENTRIES = 'tc_timeEntries';
   const K_SCHEDULE = 'tc_schedule';
+  const K_PIN = 'tc_adminPin';
 
   let employees = [];
   let entries = [];
@@ -504,6 +541,8 @@
   let currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   let selectedDay = null; // Date
   let reviewDate = null; // Date
+  let unlocked = false;
+  let adminPin = '2026';
 
   let turnoDay = null; // 0-6 for the modal being edited
   let editingTurnoId = null;
@@ -588,11 +627,13 @@
       employees = data[K_EMPLOYEES] ? JSON.parse(data[K_EMPLOYEES]) : [];
       entries = data[K_ENTRIES] ? JSON.parse(data[K_ENTRIES]) : [];
       schedule = data[K_SCHEDULE] ? JSON.parse(data[K_SCHEDULE]) : [];
+      if(data[K_PIN]) adminPin = data[K_PIN];
       setSyncStatus('Conectado a Google Sheets ✓');
       // guardamos una copia local por si algún día falla la conexión
       localSet('tc_employees_cache', JSON.stringify(employees));
       localSet('tc_entries_cache', JSON.stringify(entries));
       localSet('tc_schedule_cache', JSON.stringify(schedule));
+      localSet('tc_adminpin_cache', adminPin);
     }catch(err){
       setSyncStatus('Sin conexión con Sheets — usando copia local. ' + err.message, true);
       const e1 = localGet('tc_employees_cache');
@@ -601,6 +642,8 @@
       entries = e2 ? JSON.parse(e2) : [];
       const e3 = localGet('tc_schedule_cache');
       schedule = e3 ? JSON.parse(e3) : [];
+      const e4 = localGet('tc_adminpin_cache');
+      if(e4) adminPin = e4;
     }
   }
 
@@ -629,13 +672,13 @@
       const rateLabel = emp.rateType === 'hourly' ? `${emp.rate.toFixed(2)} €/h` : `${emp.rate.toFixed(2)} €/mes fijo`;
       return `
         <div class="card">
-          <div class="card-actions">
+          <div class="card-actions admin-only">
             <button class="icon-btn" data-edit="${emp.id}" title="Editar">✎</button>
             <button class="icon-btn" data-del="${emp.id}" title="Eliminar">✕</button>
           </div>
           <span class="badge ${emp.type}">${emp.type === 'cocina' ? 'Cocina' : 'Barra'}</span>
           <div class="name">${escapeHtml(emp.name)}</div>
-          <div class="rate mono">${rateLabel}</div>
+          <div class="rate mono admin-only">${rateLabel}</div>
           <span class="status ${isIn ? 'in' : 'out'}"><span class="dot"></span>${isIn ? 'Dentro' : 'Fuera'}</span>
           ${isIn ? `<span class="since mono">desde las ${fmtTime(open.clockIn)}</span>` : ''}
           <button class="punch ${isIn ? 'salida' : 'entrada'}" data-punch="${emp.id}">${isIn ? '⏹ Fichar salida' : '▶ Fichar entrada'}</button>
@@ -1625,6 +1668,54 @@
     saveEntries();
   });
 
+  // ---------- Modo tablet / gestión ----------
+  function applyLockState(){
+    document.body.classList.toggle('locked', !unlocked);
+    document.body.classList.toggle('unlocked', unlocked);
+    $('#adminLockBtn').textContent = unlocked ? '🔓' : '🔒';
+    $('#adminLockBtn').title = unlocked ? 'Salir del modo gestión' : 'Modo gestión';
+    if(!unlocked){
+      document.querySelectorAll('.tab-main').forEach(b => b.classList.toggle('active', b.dataset.tab === 'fichar'));
+      document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-fichar'));
+    }
+  }
+
+  function closePinModal(){ $('#pinModalBackdrop').classList.remove('open'); }
+
+  $('#adminLockBtn').addEventListener('click', () => {
+    if(unlocked){
+      unlocked = false;
+      applyLockState();
+    } else {
+      $('#pinInput').value = '';
+      $('#pinModalBackdrop').classList.add('open');
+      setTimeout(() => $('#pinInput').focus(), 60);
+    }
+  });
+  $('#cancelPinBtn').addEventListener('click', closePinModal);
+  $('#pinModalBackdrop').addEventListener('click', (ev) => { if(ev.target.id === 'pinModalBackdrop') closePinModal(); });
+  $('#pinInput').addEventListener('keydown', (ev) => { if(ev.key === 'Enter') $('#submitPinBtn').click(); });
+  $('#submitPinBtn').addEventListener('click', () => {
+    if($('#pinInput').value === adminPin){
+      unlocked = true;
+      closePinModal();
+      applyLockState();
+    } else {
+      alert('Código incorrecto');
+    }
+  });
+
+  async function saveAdminPin(newPin){
+    adminPin = newPin;
+    localSet('tc_adminpin_cache', newPin);
+    try{ await postKeys({[K_PIN]: newPin}); }catch(err){ /* se reintentará solo en el próximo guardado */ }
+  }
+
+  $('#changePinBtn').addEventListener('click', () => {
+    const np = prompt('Nuevo código de gestión (solo tú lo necesitas para entrar):', adminPin);
+    if(np && np.trim()){ saveAdminPin(np.trim()); alert('Código actualizado.'); }
+  });
+
   // ---------- Init ----------
   function populateTimeSelects(){
     let opts = '';
@@ -1635,6 +1726,7 @@
     ['turnoStart','turnoEnd','manualStart','manualEnd','punchTime'].forEach(id => { $('#'+id).innerHTML = opts; });
   }
   populateTimeSelects();
+  applyLockState();
 
   setInterval(renderClock, 1000);
   renderClock();
