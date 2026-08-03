@@ -297,6 +297,7 @@
         <h2>Planificación semanal</h2>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn ghost small" id="copyWeekBtn">⧉ Copiar esta semana a…</button>
+          <button class="btn ghost small" id="reviewScheduleBtn">✓ Revisar y confirmar horas</button>
           <button class="btn ghost small" id="shareScheduleBtn">📄 Compartir horario (PDF)</button>
         </div>
       </div>
@@ -381,6 +382,22 @@
     <div class="modal-actions">
       <button class="btn ghost" id="cancelPunchBtn">Cancelar</button>
       <button class="btn" id="confirmPunchBtn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Revisar y confirmar horas día por día -->
+<div class="modal-backdrop" id="reviewModalBackdrop">
+  <div class="modal">
+    <h3 id="reviewModalTitle">Revisar horas</h3>
+    <div class="existing-list" id="reviewShiftsList"></div>
+    <div class="modal-actions" style="margin-bottom:10px;">
+      <button class="btn ghost" id="reviewPrevBtn">‹ Día anterior</button>
+      <button class="btn ghost" id="reviewNextBtn">Día siguiente ›</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="closeReviewBtn">Cerrar</button>
+      <button class="btn" id="confirmReviewDayBtn">✓ Confirmar horas de este día</button>
     </div>
   </div>
 </div>
@@ -486,6 +503,7 @@
 
   let currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   let selectedDay = null; // Date
+  let reviewDate = null; // Date
 
   let turnoDay = null; // 0-6 for the modal being edited
   let editingTurnoId = null;
@@ -1183,6 +1201,75 @@
   }
 
   function closeDayModal(){ $('#dayModalBackdrop').classList.remove('open'); selectedDay = null; }
+
+  // ---------- Revisar y confirmar horas ----------
+  function renderReviewDay(){
+    const dateStr = isoDate(reviewDate);
+    const weekday = reviewDate.toLocaleDateString('es-ES', {weekday:'long'});
+    $('#reviewModalTitle').textContent = `${weekday.charAt(0).toUpperCase()+weekday.slice(1)} ${fmtDate(reviewDate)}`;
+
+    const weekStartForDay = mondayOf(reviewDate);
+    const weekKey = isoDate(weekStartForDay);
+    const dayIdx = (reviewDate.getDay() + 6) % 7;
+    const shifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx)
+      .map(s => ({s, emp: employees.find(e => e.id === s.employeeId)}))
+      .filter(x => x.emp)
+      .sort((a,b) => a.s.start.localeCompare(b.s.start));
+
+    const list = $('#reviewShiftsList');
+    if(shifts.length === 0){
+      list.innerHTML = '<div class="empty" style="padding:14px;">Sin turnos planificados este día</div>';
+    } else {
+      list.innerHTML = shifts.map(({s, emp}) => `
+        <div class="existing-item">
+          <span>${escapeHtml(emp.name)} <span class="badge ${emp.type}">${emp.type === 'cocina' ? 'Coc' : 'Bar'}</span> <span class="et">${s.start}–${s.end === 'cierre' ? 'Cierre' : s.end}</span></span>
+        </div>`).join('');
+    }
+    const already = entriesOnDate(dateStr).length;
+    if(already > 0){
+      list.innerHTML += `<div class="cost-note" style="margin-top:8px;">Ya hay ${already} hora(s) reales registradas este día.</div>`;
+    }
+  }
+
+  function openReviewModal(){
+    reviewDate = new Date(currentWeekStart);
+    renderReviewDay();
+    $('#reviewModalBackdrop').classList.add('open');
+  }
+  function closeReviewModal(){ $('#reviewModalBackdrop').classList.remove('open'); }
+
+  $('#reviewScheduleBtn').addEventListener('click', openReviewModal);
+  $('#closeReviewBtn').addEventListener('click', closeReviewModal);
+  $('#reviewModalBackdrop').addEventListener('click', (ev) => { if(ev.target.id === 'reviewModalBackdrop') closeReviewModal(); });
+  $('#reviewPrevBtn').addEventListener('click', () => { reviewDate.setDate(reviewDate.getDate() - 1); reviewDate = new Date(reviewDate); renderReviewDay(); });
+  $('#reviewNextBtn').addEventListener('click', () => { reviewDate.setDate(reviewDate.getDate() + 1); reviewDate = new Date(reviewDate); renderReviewDay(); });
+
+  $('#confirmReviewDayBtn').addEventListener('click', () => {
+    const dateStr = isoDate(reviewDate);
+    const already = entriesOnDate(dateStr).length;
+    if(already > 0 && !confirm('Ya hay horas registradas este día. ¿Añadir también las planificadas? Podría duplicar horas si ya las metiste antes.')) return;
+
+    const weekStartForDay = mondayOf(reviewDate);
+    const weekKey = isoDate(weekStartForDay);
+    const dayIdx = (reviewDate.getDay() + 6) % 7;
+    const shifts = schedule.filter(s => s.weekStart === weekKey && s.day === dayIdx);
+    if(shifts.length === 0){ alert('No hay turnos planificados este día.'); return; }
+
+    let imported = 0, skipped = 0;
+    shifts.forEach(s => {
+      if(s.end === 'cierre'){ skipped++; return; }
+      const clockIn = new Date(dateStr + 'T' + s.start + ':00');
+      let clockOut = new Date(dateStr + 'T' + s.end + ':00');
+      if(clockOut <= clockIn) clockOut.setDate(clockOut.getDate() + 1);
+      entries.push({id:uid(), employeeId:s.employeeId, clockIn:clockIn.toISOString(), clockOut:clockOut.toISOString(), source:'manual'});
+      imported++;
+    });
+
+    renderAll();
+    saveEntries();
+    renderReviewDay();
+    if(skipped > 0) alert(`${imported} turno(s) confirmados. ${skipped} "hasta el cierre" no se han importado — añádelos a mano en Calendario.`);
+  });
 
   // ---------- Render all ----------
   function renderAll(){
