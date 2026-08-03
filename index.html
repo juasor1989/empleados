@@ -158,6 +158,8 @@
 
   /* Horario */
   .week-nav{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+  .period-nav{display:flex; align-items:center; gap:12px; margin:12px 0 16px;}
+  .period-nav .period-label{font-size:13px; color:var(--muted); min-width:150px;}
   .week-nav .week-label{font-weight:600; font-family:'IBM Plex Mono',monospace; font-size:14px;}
   .days-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:12px;}
   .timeline-row{align-items:start;}
@@ -301,6 +303,12 @@
           <button class="chip" data-period="semana">Semana</button>
           <button class="chip" data-period="mes">Mes</button>
         </div>
+      </div>
+      <div class="period-nav admin-only">
+        <button class="btn ghost small" id="periodPrevBtn">‹</button>
+        <span class="period-label mono" id="periodLabel"></span>
+        <button class="btn ghost small" id="periodNextBtn">›</button>
+        <button class="btn ghost small" id="periodTodayBtn">Hoy</button>
       </div>
       <div id="summaryWrap" class="table-scroll admin-only"></div>
 
@@ -530,6 +538,7 @@
   let schedule = [];
 
   let currentPeriod = 'semana';
+  let costAnchorDate = new Date();
   let editingEmpId = null;
   let rateType = 'hourly';
   let empType = 'barra';
@@ -688,7 +697,7 @@
   }
 
   function getPeriodRange(period){
-    const now = new Date();
+    const now = costAnchorDate;
     if(period === 'semana'){
       const start = mondayOf(now);
       const end = new Date(start); end.setDate(start.getDate() + 7);
@@ -697,6 +706,16 @@
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       return {start, end};
+    }
+  }
+
+  function renderPeriodLabel(){
+    const {start, end} = getPeriodRange(currentPeriod);
+    if(currentPeriod === 'semana'){
+      const last = new Date(end); last.setDate(end.getDate() - 1);
+      $('#periodLabel').textContent = `${fmtDate(start)} – ${fmtDate(last)}`;
+    } else {
+      $('#periodLabel').textContent = start.toLocaleDateString('es-ES', {month:'long', year:'numeric'});
     }
   }
 
@@ -1317,6 +1336,7 @@
   // ---------- Render all ----------
   function renderAll(){
     renderEmployees();
+    renderPeriodLabel();
     renderSummary();
     renderDailyCostChart();
     renderScheduleWeekLabel();
@@ -1408,12 +1428,31 @@
   document.querySelectorAll('#view-fichar .chip').forEach(chip => {
     chip.addEventListener('click', () => {
       currentPeriod = chip.dataset.period;
+      costAnchorDate = new Date();
       document.querySelectorAll('#view-fichar .chip').forEach(c => c.classList.toggle('active', c === chip));
+      renderPeriodLabel();
       renderSummary();
       renderDailyCostChart();
     });
   });
   $('#view-fichar .chip[data-period="semana"]').classList.add('active');
+
+  function shiftPeriod(dir){
+    if(currentPeriod === 'semana') costAnchorDate.setDate(costAnchorDate.getDate() + dir*7);
+    else costAnchorDate.setMonth(costAnchorDate.getMonth() + dir);
+    costAnchorDate = new Date(costAnchorDate);
+    renderPeriodLabel();
+    renderSummary();
+    renderDailyCostChart();
+  }
+  $('#periodPrevBtn').addEventListener('click', () => shiftPeriod(-1));
+  $('#periodNextBtn').addEventListener('click', () => shiftPeriod(1));
+  $('#periodTodayBtn').addEventListener('click', () => {
+    costAnchorDate = new Date();
+    renderPeriodLabel();
+    renderSummary();
+    renderDailyCostChart();
+  });
 
   // ---------- Employee modal ----------
   const empBackdrop = $('#employeeModalBackdrop');
