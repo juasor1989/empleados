@@ -160,6 +160,10 @@
   .week-nav{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
   .period-nav{display:flex; align-items:center; gap:12px; margin:12px 0 16px;}
   .period-nav .period-label{font-size:13px; color:var(--muted); min-width:150px;}
+  .emp-filter-select{
+    padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--text); font-family:inherit; font-size:13px; cursor:pointer;
+  }
   .week-nav .week-label{font-weight:600; font-family:'IBM Plex Mono',monospace; font-size:14px;}
   .days-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:12px;}
   .timeline-row{align-items:start;}
@@ -314,10 +318,13 @@
 
       <div class="section-title admin-only" style="margin-top:30px;">
         <h2>Gasto por día</h2>
+        <select id="employeeFilterSelect" class="emp-filter-select">
+          <option value="all">Todos los empleados</option>
+        </select>
       </div>
       <div class="kpi-row admin-only" id="kpiWrap"></div>
       <div id="dailyCostWrap" class="admin-only"></div>
-      <div class="cost-note admin-only">Solo incluye empleados por hora — los sueldos fijos se reflejan en el total del mes, no día a día.</div>
+      <div class="cost-note admin-only" id="dailyCostNote">Solo incluye empleados por hora — los sueldos fijos se reflejan en el total del mes, no día a día.</div>
     </div>
 
     <!-- HORARIO -->
@@ -406,7 +413,7 @@
     <h3>Modo gestión</h3>
     <div class="field">
       <label>Código</label>
-      <input type="text" id="pinInput" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="····">
+      <input type="text" id="pinInput" inputmode="numeric" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="····">
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelPinBtn">Cancelar</button>
@@ -539,6 +546,7 @@
 
   let currentPeriod = 'semana';
   let costAnchorDate = new Date();
+  let employeeFilter = 'all';
   let editingEmpId = null;
   let rateType = 'hourly';
   let empType = 'barra';
@@ -780,75 +788,162 @@
     return days;
   }
 
+  function getDailyStatsForEmployee(period, empId){
+    const {start, end} = getPeriodRange(period);
+    const emp = employees.find(e => e.id === empId);
+    const days = [];
+    let cursor = new Date(start);
+    while(cursor < end){
+      const dayStart = new Date(cursor); dayStart.setHours(0,0,0,0);
+      const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate()+1);
+      const hours = emp ? hoursWorkedInRange(emp.id, dayStart, dayEnd) : 0;
+      const cost = (emp && emp.rateType === 'hourly') ? hours * emp.rate : null;
+      days.push({date:new Date(dayStart), hours, cost});
+      cursor.setDate(cursor.getDate()+1);
+    }
+    return days;
+  }
+
+  function populateEmployeeFilterSelect(){
+    const sel = $('#employeeFilterSelect');
+    const current = sel.value;
+    sel.innerHTML = '<option value="all">Todos los empleados</option>' +
+      employees.map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('');
+    if(employees.some(e => e.id === current)) sel.value = current;
+  }
+
   function renderKpiCards(){
     const wrap = $('#kpiWrap');
-    const hourlyEmployees = employees.filter(e => e.rateType === 'hourly');
-    if(hourlyEmployees.length === 0){ wrap.innerHTML = ''; return; }
-    const days = getDailyCostsByEmployee(currentPeriod);
-    const total = days.reduce((s,d) => s + d.total, 0);
-    const avg = total / days.length;
-    const maxDay = days.reduce((best,d) => d.total > (best ? best.total : -1) ? d : best, null);
-    const daysWithCost = days.filter(d => d.total > 0);
-    const minDay = daysWithCost.length ? daysWithCost.reduce((worst,d) => d.total < worst.total ? d : worst) : null;
+    if(employeeFilter === 'all'){
+      const hourlyEmployees = employees.filter(e => e.rateType === 'hourly');
+      if(hourlyEmployees.length === 0){ wrap.innerHTML = ''; return; }
+      const days = getDailyCostsByEmployee(currentPeriod);
+      const total = days.reduce((s,d) => s + d.total, 0);
+      const avg = total / days.length;
+      const maxDay = days.reduce((best,d) => d.total > (best ? best.total : -1) ? d : best, null);
+      const daysWithCost = days.filter(d => d.total > 0);
+      const minDay = daysWithCost.length ? daysWithCost.reduce((worst,d) => d.total < worst.total ? d : worst) : null;
 
-    const cards = [
-      {label: currentPeriod === 'semana' ? 'Total semana' : 'Total mes', value: `${total.toFixed(0)} €`, sub: `${days.length} días`, accent: 'var(--copper)'},
-      {label: 'Media diaria', value: `${avg.toFixed(0)} €`, sub: 'por día del periodo', accent: 'var(--barra)'},
-      {label: 'Día más caro', value: maxDay ? `${maxDay.total.toFixed(0)} €` : '—', sub: maxDay ? fmtDateShort(maxDay.date) : '', accent: 'var(--danger)'},
-      {label: 'Día más barato', value: minDay ? `${minDay.total.toFixed(0)} €` : '—', sub: minDay ? fmtDateShort(minDay.date) : 'sin gasto', accent: 'var(--in)'},
-    ];
-    wrap.innerHTML = cards.map(c => `
-      <div class="kpi-card" style="--kpi-accent:${c.accent}">
-        <div class="kpi-label">${c.label}</div>
-        <div class="kpi-value">${c.value}</div>
-        <div class="kpi-sub">${c.sub}</div>
-      </div>
-    `).join('');
+      const cards = [
+        {label: currentPeriod === 'semana' ? 'Total semana' : 'Total mes', value: `${total.toFixed(0)} €`, sub: `${days.length} días`, accent: 'var(--copper)'},
+        {label: 'Media diaria', value: `${avg.toFixed(0)} €`, sub: 'por día del periodo', accent: 'var(--barra)'},
+        {label: 'Día más caro', value: maxDay ? `${maxDay.total.toFixed(0)} €` : '—', sub: maxDay ? fmtDateShort(maxDay.date) : '', accent: 'var(--danger)'},
+        {label: 'Día más barato', value: minDay ? `${minDay.total.toFixed(0)} €` : '—', sub: minDay ? fmtDateShort(minDay.date) : 'sin gasto', accent: 'var(--in)'},
+      ];
+      wrap.innerHTML = cards.map(c => `
+        <div class="kpi-card" style="--kpi-accent:${c.accent}">
+          <div class="kpi-label">${c.label}</div>
+          <div class="kpi-value">${c.value}</div>
+          <div class="kpi-sub">${c.sub}</div>
+        </div>
+      `).join('');
+    } else {
+      const emp = employees.find(e => e.id === employeeFilter);
+      if(!emp){ wrap.innerHTML = ''; return; }
+      const days = getDailyStatsForEmployee(currentPeriod, employeeFilter);
+      const totalHours = days.reduce((s,d) => s + d.hours, 0);
+      const avgHours = totalHours / days.length;
+      const maxDay = days.reduce((best,d) => d.hours > (best ? best.hours : -1) ? d : best, null);
+      const isHourly = emp.rateType === 'hourly';
+      const totalPay = isHourly ? totalHours * emp.rate : emp.rate / 4.345 * (currentPeriod === 'mes' ? 4.345 : 1);
+
+      const cards = [
+        {label: currentPeriod === 'semana' ? 'Horas esta semana' : 'Horas este mes', value: `${totalHours.toFixed(1).replace(/\.0$/,'')} h`, sub: `${days.length} días`, accent: 'var(--copper)'},
+        {label: 'Media diaria', value: `${avgHours.toFixed(1).replace(/\.0$/,'')} h`, sub: 'por día del periodo', accent: 'var(--barra)'},
+        {label: 'Día con más horas', value: maxDay && maxDay.hours > 0 ? `${maxDay.hours.toFixed(1).replace(/\.0$/,'')} h` : '—', sub: maxDay && maxDay.hours > 0 ? fmtDateShort(maxDay.date) : '', accent: 'var(--danger)'},
+        {label: isHourly ? 'Pago del periodo' : 'Sueldo (prorrateado)', value: `${totalPay.toFixed(2)} €`, sub: isHourly ? `${emp.rate.toFixed(2)} €/h` : 'fijo mensual', accent: 'var(--in)'},
+      ];
+      wrap.innerHTML = cards.map(c => `
+        <div class="kpi-card" style="--kpi-accent:${c.accent}">
+          <div class="kpi-label">${c.label}</div>
+          <div class="kpi-value">${c.value}</div>
+          <div class="kpi-sub">${c.sub}</div>
+        </div>
+      `).join('');
+    }
   }
 
   function renderDailyCostChart(){
     renderKpiCards();
     const wrap = $('#dailyCostWrap');
-    const hourlyEmployees = employees.filter(e => e.rateType === 'hourly');
-    if(hourlyEmployees.length === 0){
-      wrap.innerHTML = '<div class="empty">Añade empleados por hora para ver aquí el desglose de gasto.</div>';
-      return;
-    }
-    const days = getDailyCostsByEmployee(currentPeriod);
-    const todayStr = isoDate(new Date());
-    const max = Math.max(...days.map(d => d.total), 1);
-    const DOW_LETTERS = ['L','M','X','J','V','S','D'];
+    const note = $('#dailyCostNote');
 
-    const bars = days.map(d => {
-      const segs = d.perEmp.filter(p => p.cost > 0).map(p => {
-        const segH = (p.cost / max) * 100;
-        return `<div class="cost-seg" style="height:${segH}%; background:${colorForEmployee(p.emp.id)}" title="${escapeHtml(p.emp.name)}: ${p.cost.toFixed(2)} €"></div>`;
+    if(employeeFilter === 'all'){
+      note.textContent = 'Solo incluye empleados por hora — los sueldos fijos se reflejan en el total del mes, no día a día.';
+      const hourlyEmployees = employees.filter(e => e.rateType === 'hourly');
+      if(hourlyEmployees.length === 0){
+        wrap.innerHTML = '<div class="empty">Añade empleados por hora para ver aquí el desglose de gasto.</div>';
+        return;
+      }
+      const days = getDailyCostsByEmployee(currentPeriod);
+      const todayStr = isoDate(new Date());
+      const max = Math.max(...days.map(d => d.total), 1);
+      const DOW_LETTERS = ['L','M','X','J','V','S','D'];
+
+      const bars = days.map(d => {
+        const segs = d.perEmp.filter(p => p.cost > 0).map(p => {
+          const segH = (p.cost / max) * 100;
+          return `<div class="cost-seg" style="height:${segH}%; background:${colorForEmployee(p.emp.id)}" title="${escapeHtml(p.emp.name)}: ${p.cost.toFixed(2)} €"></div>`;
+        }).join('');
+        const isToday = isoDate(d.date) === todayStr;
+        const dow = DOW_LETTERS[(d.date.getDay() + 6) % 7];
+        return `
+          <div class="cost-bar-col ${isToday ? 'today' : ''}">
+            <div class="cost-bar-value">${d.total > 0 ? d.total.toFixed(0) + '€' : ''}</div>
+            <div class="cost-bar stacked">${segs}</div>
+            <div class="cost-bar-label"><span class="cost-bar-dow">${dow}</span>${fmtDateShort(d.date)}</div>
+          </div>`;
       }).join('');
-      const isToday = isoDate(d.date) === todayStr;
-      const dow = DOW_LETTERS[(d.date.getDay() + 6) % 7];
-      return `
-        <div class="cost-bar-col ${isToday ? 'today' : ''}">
-          <div class="cost-bar-value">${d.total > 0 ? d.total.toFixed(0) + '€' : ''}</div>
-          <div class="cost-bar stacked">${segs}</div>
-          <div class="cost-bar-label"><span class="cost-bar-dow">${dow}</span>${fmtDateShort(d.date)}</div>
+
+      const avg = days.reduce((s,d) => s + d.total, 0) / days.length;
+      const avgPct = Math.min((avg / max) * 100, 100);
+      const avgLineHtml = avg > 0 ? `
+        <div class="cost-avg-line" style="bottom:${avgPct}%"></div>
+        <div class="cost-avg-label" style="bottom:${avgPct}%">media ${avg.toFixed(0)}€</div>` : '';
+
+      const legend = hourlyEmployees.map(e => `<span class="legend-item"><span class="legend-swatch" style="background:${colorForEmployee(e.id)}"></span>${escapeHtml(e.name)}</span>`).join('');
+      const grandTotal = days.reduce((s,d) => s + d.total, 0);
+
+      wrap.innerHTML = `
+        <div class="cost-chart-card">
+          <div class="cost-chart">${avgLineHtml}${bars}</div>
+          <div class="cost-legend">${legend}</div>
+          <div class="cost-chart-total">Total ${currentPeriod === 'semana' ? 'esta semana' : 'este mes'} (por hora): <strong>${grandTotal.toFixed(2)} €</strong></div>
         </div>`;
-    }).join('');
+    } else {
+      const emp = employees.find(e => e.id === employeeFilter);
+      if(!emp){ wrap.innerHTML = ''; return; }
+      note.textContent = emp.rateType === 'hourly'
+        ? 'Barras = horas trabajadas ese día. El número de arriba es el coste (horas × precio/hora).'
+        : 'Barras = horas trabajadas ese día. Al ser sueldo fijo, el coste no se calcula día a día.';
+      const days = getDailyStatsForEmployee(currentPeriod, employeeFilter);
+      const todayStr = isoDate(new Date());
+      const max = Math.max(...days.map(d => d.hours), 1);
+      const DOW_LETTERS = ['L','M','X','J','V','S','D'];
+      const color = colorForEmployee(emp.id);
 
-    const avg = days.reduce((s,d) => s + d.total, 0) / days.length;
-    const avgPct = Math.min((avg / max) * 100, 100);
-    const avgLineHtml = avg > 0 ? `
-      <div class="cost-avg-line" style="bottom:${avgPct}%"></div>
-      <div class="cost-avg-label" style="bottom:${avgPct}%">media ${avg.toFixed(0)}€</div>` : '';
+      const bars = days.map(d => {
+        const h = Math.max((d.hours / max) * 100, d.hours > 0 ? 2 : 0);
+        const isToday = isoDate(d.date) === todayStr;
+        const dow = DOW_LETTERS[(d.date.getDay() + 6) % 7];
+        const topLabel = d.hours > 0 ? `${d.hours.toFixed(1).replace(/\.0$/,'')}h${d.cost !== null ? ' · ' + d.cost.toFixed(0) + '€' : ''}` : '';
+        return `
+          <div class="cost-bar-col ${isToday ? 'today' : ''}">
+            <div class="cost-bar-value">${topLabel}</div>
+            <div class="cost-bar" style="height:${h}%; background:${color};"></div>
+            <div class="cost-bar-label"><span class="cost-bar-dow">${dow}</span>${fmtDateShort(d.date)}</div>
+          </div>`;
+      }).join('');
 
-    const legend = hourlyEmployees.map(e => `<span class="legend-item"><span class="legend-swatch" style="background:${colorForEmployee(e.id)}"></span>${escapeHtml(e.name)}</span>`).join('');
-    const grandTotal = days.reduce((s,d) => s + d.total, 0);
+      const totalHours = days.reduce((s,d) => s + d.hours, 0);
+      const totalCost = emp.rateType === 'hourly' ? days.reduce((s,d) => s + (d.cost || 0), 0) : null;
 
-    wrap.innerHTML = `
-      <div class="cost-chart-card">
-        <div class="cost-chart">${avgLineHtml}${bars}</div>
-        <div class="cost-legend">${legend}</div>
-        <div class="cost-chart-total">Total ${currentPeriod === 'semana' ? 'esta semana' : 'este mes'} (por hora): <strong>${grandTotal.toFixed(2)} €</strong></div>
-      </div>`;
+      wrap.innerHTML = `
+        <div class="cost-chart-card">
+          <div class="cost-chart">${bars}</div>
+          <div class="cost-chart-total">Total ${currentPeriod === 'semana' ? 'esta semana' : 'este mes'}: <strong>${totalHours.toFixed(1).replace(/\.0$/,'')} h</strong>${totalCost !== null ? ` · <strong>${totalCost.toFixed(2)} €</strong>` : ''}</div>
+        </div>`;
+    }
   }
 
   // ---------- Horario ----------
@@ -1336,6 +1431,7 @@
   // ---------- Render all ----------
   function renderAll(){
     renderEmployees();
+    populateEmployeeFilterSelect();
     renderPeriodLabel();
     renderSummary();
     renderDailyCostChart();
@@ -1451,6 +1547,11 @@
     costAnchorDate = new Date();
     renderPeriodLabel();
     renderSummary();
+    renderDailyCostChart();
+  });
+
+  $('#employeeFilterSelect').addEventListener('change', (ev) => {
+    employeeFilter = ev.target.value;
     renderDailyCostChart();
   });
 
