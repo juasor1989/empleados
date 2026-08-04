@@ -406,7 +406,7 @@
     <h3>Modo gestión</h3>
     <div class="field">
       <label>Código</label>
-      <input type="password" id="pinInput" inputmode="numeric" placeholder="····">
+      <input type="text" id="pinInput" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="····">
     </div>
     <div class="modal-actions">
       <button class="btn ghost" id="cancelPinBtn">Cancelar</button>
@@ -1735,7 +1735,7 @@
   $('#pinModalBackdrop').addEventListener('click', (ev) => { if(ev.target.id === 'pinModalBackdrop') closePinModal(); });
   $('#pinInput').addEventListener('keydown', (ev) => { if(ev.key === 'Enter') $('#submitPinBtn').click(); });
   $('#submitPinBtn').addEventListener('click', () => {
-    if($('#pinInput').value === adminPin){
+    if($('#pinInput').value.trim() === String(adminPin).trim()){
       unlocked = true;
       closePinModal();
       applyLockState();
