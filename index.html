@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>La Sede · Fichajes</title>
+<title>La Sede · FICHAJES</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -588,7 +588,7 @@
   }
 
   async function fetchAll(){
-    const res = await fetch(SHEET_API_URL, {method:'GET'});
+    const res = await fetch(SHEET_API_URL + '?t=' + Date.now(), {method:'GET', mode:'cors'});
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     if(data.error) throw new Error(data.error);
@@ -599,7 +599,8 @@
     const res = await fetch(SHEET_API_URL, {
       method:'POST',
       headers: {'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify(obj)
+      body: JSON.stringify(obj),
+      mode:'cors'
     });
     const data = await res.json().catch(()=>({}));
     if(data.error) throw new Error(data.error);
@@ -638,7 +639,18 @@
     }catch(err){ setSyncStatus('No se pudo guardar en Sheets: ' + err.message, true); }
   }
 
-  async function loadData(){
+  function loadLocalCacheSync(){
+    const e1 = localGet('tc_employees_cache');
+    employees = e1 ? JSON.parse(e1) : [];
+    const e2 = localGet('tc_entries_cache');
+    entries = e2 ? JSON.parse(e2) : [];
+    const e3 = localGet('tc_schedule_cache');
+    schedule = e3 ? JSON.parse(e3) : [];
+    const e4 = localGet('tc_adminpin_cache');
+    if(e4) adminPin = e4;
+  }
+
+  async function syncFromCloud(){
     try{
       const data = await fetchAll();
       employees = data[K_EMPLOYEES] ? JSON.parse(data[K_EMPLOYEES]) : [];
@@ -646,21 +658,13 @@
       schedule = data[K_SCHEDULE] ? JSON.parse(data[K_SCHEDULE]) : [];
       if(data[K_PIN]) adminPin = data[K_PIN];
       setSyncStatus('Conectado a Google Sheets ✓');
-      // guardamos una copia local por si algún día falla la conexión
       localSet('tc_employees_cache', JSON.stringify(employees));
       localSet('tc_entries_cache', JSON.stringify(entries));
       localSet('tc_schedule_cache', JSON.stringify(schedule));
       localSet('tc_adminpin_cache', adminPin);
+      renderAll();
     }catch(err){
       setSyncStatus('Sin conexión con Sheets — usando copia local. ' + err.message, true);
-      const e1 = localGet('tc_employees_cache');
-      employees = e1 ? JSON.parse(e1) : [];
-      const e2 = localGet('tc_entries_cache');
-      entries = e2 ? JSON.parse(e2) : [];
-      const e3 = localGet('tc_schedule_cache');
-      schedule = e3 ? JSON.parse(e3) : [];
-      const e4 = localGet('tc_adminpin_cache');
-      if(e4) adminPin = e4;
     }
   }
 
@@ -1871,11 +1875,12 @@
   setInterval(renderClock, 1000);
   renderClock();
 
-  loadData().then(() => {
-    $('#loading').style.display = 'none';
-    $('#app').style.display = 'block';
-    renderAll();
-  });
+  loadLocalCacheSync();
+  $('#loading').style.display = 'none';
+  $('#app').style.display = 'block';
+  renderAll();
+  setSyncStatus('☁ Conectando con Google Sheets…');
+  syncFromCloud();
 })();
 </script>
 </body>
