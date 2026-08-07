@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>La Sede · FICHAJES</title>
+<title>La Sede · Fichajes</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -67,9 +67,13 @@
   .cost-bar-col{display:flex; flex-direction:column; align-items:center; justify-content:flex-end; min-width:34px; height:100%; flex-shrink:0; position:relative;}
   .cost-bar-value{font-size:10px; font-weight:600; color:var(--text); margin-bottom:5px; white-space:nowrap; font-family:'IBM Plex Mono',monospace; opacity:.9;}
   .cost-bar{width:20px; background:linear-gradient(180deg, var(--copper-bright), var(--copper)); border-radius:5px 5px 2px 2px; min-height:3px; transition:transform .15s ease, filter .15s ease; transform-origin:bottom; animation:growBar .5s ease-out;}
+  .cost-bar.stacked{width:38px;}
   .cost-bar-col:hover .cost-bar{transform:scaleX(1.15); filter:brightness(1.12);}
   .cost-bar.stacked{display:flex; flex-direction:column-reverse; overflow:hidden; background:none;}
-  .cost-seg{width:100%;}
+  .cost-seg{width:100%; border-top:1px solid rgba(23,19,15,.5); position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .cost-seg:first-child{border-top:none;}
+  .seg-hours, .seg-cost{font-size:8px; font-weight:700; color:#17130f; line-height:1; white-space:nowrap;}
+  .seg-split{display:flex; align-items:center; justify-content:space-between; width:100%; padding:0 3px;}
   .cost-seg:first-child{border-radius:0 0 2px 2px;}
   .cost-seg:last-child{border-radius:5px 5px 0 0;}
   .cost-bar-col.today .cost-bar-value{color:var(--copper-bright);}
@@ -136,6 +140,7 @@
   .status.out{background:rgba(154,138,120,.12); color:var(--muted);}
   .status .dot{width:6px; height:6px; border-radius:50%; background:currentColor;}
   .card .since{font-size:12px; color:var(--muted); margin-top:-8px; margin-bottom:12px; display:block;}
+  .forgotten-warning{font-size:11px; color:var(--danger); background:rgba(179,84,63,.14); border-radius:6px; padding:5px 8px; margin-bottom:10px;}
   .punch{width:100%; padding:12px; border-radius:8px; border:none; cursor:pointer; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13.5px; transition: transform .08s ease, background .15s;}
   .punch:active{transform:scale(.97);}
   .punch.entrada{background:var(--in); color:#0f1a0d;}
@@ -184,6 +189,10 @@
   .tl-side-labels .barra{color:var(--barra);}
   .tl-side-labels .cocina{color:var(--cocina);}
   .timeline-gridline{position:absolute; left:0; right:0; border-top:1px solid var(--line);}
+  .tl-band{position:absolute; left:0; right:0; pointer-events:none; border-top:1.5px solid rgba(240,224,199,.2);}
+  .tl-band:first-child{border-top:none;}
+  .tl-band.shaded{background:rgba(240,224,199,.035);}
+  .tl-band-label{position:absolute; top:3px; left:5px; font-size:8.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); opacity:.6; font-weight:600;}
   .tl-block{
     position:absolute; border-radius:5px; padding:4px 3px 4px 9px; font-size:9.5px; overflow:hidden;
     cursor:pointer; color:#17130f; box-shadow:0 1px 3px rgba(0,0,0,.35); border:1px solid rgba(0,0,0,.15);
@@ -271,7 +280,7 @@
 <header>
   <div class="brand">
     <span class="eyebrow">La Sede</span>
-    <h1 class="display">Fichajes</h1>
+    <h1 class="display">FICHAJES</h1>
     <div class="sync-status" id="syncStatus">Conectando con Google Sheets…</div>
   </div>
   <div>
@@ -299,6 +308,7 @@
         <h2>Empleados</h2>
         <button class="btn admin-only" id="addEmployeeBtn">+ Añadir empleado</button>
       </div>
+      <div id="duplicateNameWarning" class="admin-only"></div>
       <div class="grid" id="employeeGrid"></div>
 
       <div class="section-title admin-only" style="margin-top:34px;">
@@ -683,6 +693,20 @@
 
   function renderEmployees(){
     const grid = $('#employeeGrid');
+
+    const nameCounts = {};
+    employees.forEach(e => { const key = e.name.trim().toLowerCase(); nameCounts[key] = (nameCounts[key]||0) + 1; });
+    const dupNames = Object.keys(nameCounts).filter(k => nameCounts[k] > 1);
+    const dupWarnEl = $('#duplicateNameWarning');
+    if(dupWarnEl){
+      if(dupNames.length > 0){
+        const dupLabels = employees.filter(e => dupNames.includes(e.name.trim().toLowerCase())).map(e => e.name);
+        dupWarnEl.innerHTML = `<div class="forgotten-warning" style="margin-bottom:14px;">⚠ Hay más de un empleado con el mismo nombre (${[...new Set(dupLabels)].join(', ')}) — sus horas pueden estar repartidas entre dos fichas distintas sin que se note. Revísalo en "Editar" de cada uno.</div>`;
+      } else {
+        dupWarnEl.innerHTML = '';
+      }
+    }
+
     if(employees.length === 0){
       grid.innerHTML = '<div class="empty">Todavía no has añadido ningún empleado. Pulsa "Añadir empleado" para empezar.</div>';
       return;
@@ -691,6 +715,18 @@
       const open = openEntryFor(emp.id);
       const isIn = !!open;
       const rateLabel = emp.rateType === 'hourly' ? `${emp.rate.toFixed(2)} €/h` : `${emp.rate.toFixed(2)} €/mes fijo`;
+      let sinceHtml = '';
+      let forgottenWarning = '';
+      if(isIn){
+        const openDate = new Date(open.clockIn);
+        const isToday = isoDate(openDate) === isoDate(new Date());
+        const sinceTxt = isToday ? `desde las ${fmtTime(open.clockIn)}` : `desde el ${fmtDate(openDate)} ${fmtTime(open.clockIn)}`;
+        sinceHtml = `<span class="since mono">${sinceTxt}</span>`;
+        const hoursOpen = (new Date() - openDate) / 3600000;
+        if(hoursOpen > 14){
+          forgottenWarning = `<div class="forgotten-warning">⚠ Lleva ${hoursOpen.toFixed(0)}h fichado — ¿olvido de salida?</div>`;
+        }
+      }
       return `
         <div class="card">
           <div class="card-actions admin-only">
@@ -701,7 +737,8 @@
           <div class="name">${escapeHtml(emp.name)}</div>
           <div class="rate mono admin-only">${rateLabel}</div>
           <span class="status ${isIn ? 'in' : 'out'}"><span class="dot"></span>${isIn ? 'Dentro' : 'Fuera'}</span>
-          ${isIn ? `<span class="since mono">desde las ${fmtTime(open.clockIn)}</span>` : ''}
+          ${sinceHtml}
+          ${forgottenWarning}
           <button class="punch ${isIn ? 'salida' : 'entrada'}" data-punch="${emp.id}">${isIn ? '⏹ Fichar salida' : '▶ Fichar entrada'}</button>
         </div>
       `;
@@ -784,7 +821,10 @@
     while(cursor < end){
       const dayStart = new Date(cursor); dayStart.setHours(0,0,0,0);
       const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate()+1);
-      const perEmp = hourlyEmployees.map(emp => ({emp, cost: hoursWorkedInRange(emp.id, dayStart, dayEnd) * emp.rate}));
+      const perEmp = hourlyEmployees.map(emp => {
+        const hours = hoursWorkedInRange(emp.id, dayStart, dayEnd);
+        return {emp, hours, cost: hours * emp.rate};
+      });
       const total = perEmp.reduce((s,p) => s + p.cost, 0);
       days.push({date:new Date(dayStart), perEmp, total});
       cursor.setDate(cursor.getDate()+1);
@@ -887,7 +927,16 @@
       const bars = days.map(d => {
         const segs = d.perEmp.filter(p => p.cost > 0).map(p => {
           const segH = (p.cost / max) * 100;
-          return `<div class="cost-seg" style="height:${segH}%; background:${colorForEmployee(p.emp.id)}" title="${escapeHtml(p.emp.name)}: ${p.cost.toFixed(2)} €"></div>`;
+          const segPx = (segH / 100) * 190; // altura aprox. en px del contenedor del gráfico
+          const hoursTxt = p.hours.toFixed(1).replace(/\.0$/,'') + 'h';
+          const costTxt = p.cost.toFixed(0) + '€';
+          let inner = '';
+          if(segPx >= 22){
+            inner = `<span class="seg-split"><span class="seg-hours">${hoursTxt}</span><span class="seg-cost">${costTxt}</span></span>`;
+          } else if(segPx >= 13){
+            inner = `<span class="seg-hours">${hoursTxt}</span>`;
+          }
+          return `<div class="cost-seg" style="height:${segH}%; background:${colorForEmployee(p.emp.id)}" title="${escapeHtml(p.emp.name)}: ${hoursTxt} · ${costTxt}">${inner}</div>`;
         }).join('');
         const isToday = isoDate(d.date) === todayStr;
         const dow = DOW_LETTERS[(d.date.getDay() + 6) % 7];
@@ -955,7 +1004,7 @@
 
   // Rango visible del timeline: 06:00 a 04:00 del día siguiente (22 horas)
   const TL_START_MIN = 11 * 60; // 11:00
-  const TL_TOTAL_MIN = 14 * 60; // hasta las 01:00
+  const TL_TOTAL_MIN = 15 * 60; // hasta las 02:00
   const TL_PX_PER_MIN = 0.62; // ~37px por hora
 
   function toRangeMinutes(timeStr){
@@ -1056,7 +1105,11 @@
     if(employees.length === 0){ wrap.innerHTML = ''; return; }
     const totals = computeWeeklyScheduledHours();
     const pay = computeWeeklyPay(totals);
-    const rows = employees.map(e => {
+    const sortedEmployees = [...employees].sort((a,b) => {
+      if(a.type !== b.type) return a.type === 'barra' ? -1 : 1;
+      return (totals[b.id]?.minutes || 0) - (totals[a.id]?.minutes || 0);
+    });
+    const rows = sortedEmployees.map(e => {
       const t = totals[e.id];
       const hours = (t.minutes / 60);
       const hoursTxt = hours > 0 ? hours.toFixed(1).replace(/\.0$/,'') + ' h' : '—';
@@ -1094,6 +1147,17 @@
     const hourMarks = [];
     for(let m = 0; m <= TL_TOTAL_MIN; m += 60) hourMarks.push(m);
 
+    const bands = [
+      {startMin: 0, endMin: toRangeMinutes('16:00'), label:'Comida', shade:true},
+      {startMin: toRangeMinutes('16:00'), endMin: toRangeMinutes('19:00'), label:'', shade:false},
+      {startMin: toRangeMinutes('19:00'), endMin: TL_TOTAL_MIN, label:'Cenas', shade:true},
+    ];
+    const bandsHtml = bands.map(b => {
+      const top = b.startMin * TL_PX_PER_MIN;
+      const height = (b.endMin - b.startMin) * TL_PX_PER_MIN;
+      return `<div class="tl-band ${b.shade ? 'shaded' : ''}" style="top:${top}px; height:${height}px;">${b.label ? `<span class="tl-band-label">${b.label}</span>` : ''}</div>`;
+    }).join('');
+
     function blocksForType(layout, type, sideOffsetPct, sideWidthPct){
       return layout.items.map(({s, emp, startMin, endMin, lane}) => {
         const top = startMin * TL_PX_PER_MIN;
@@ -1126,6 +1190,7 @@
           <div class="timeline-wrap">
             <div class="timeline-hours" style="height:${containerHeight}px">${hourLabelsHtml}</div>
             <div class="timeline-body" style="height:${containerHeight}px" data-add-turno="${dayIdx}">
+              ${bandsHtml}
               ${gridlinesHtml}
               ${blocksHtml}
             </div>
