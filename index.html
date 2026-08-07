@@ -180,8 +180,13 @@
   .add-turno-btn:hover{color:var(--copper-bright); border-color:var(--copper);}
 
   .timeline-wrap{display:flex; gap:6px;}
-  .timeline-hours{display:flex; flex-direction:column; font-size:9.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace; text-align:right; flex-shrink:0; width:26px; position:relative;}
+  .timeline-hours{display:flex; flex-direction:column; font-size:9.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace; text-align:right; flex-shrink:0; width:40px; position:relative;}
   .timeline-hours span{position:absolute; right:0; transform:translateY(-50%);}
+  .tl-band-vlabel{
+    position:absolute; left:0; width:15px; display:flex; align-items:center; justify-content:center;
+    writing-mode:vertical-rl; text-orientation:mixed; transform:rotate(180deg);
+    font-size:8px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); opacity:.65; font-weight:700;
+  }
   .timeline-body{position:relative; flex:1; background:var(--bg); border-radius:6px; cursor:crosshair; overflow:hidden;}
   .timeline-body::after{content:""; position:absolute; left:50%; top:0; bottom:0; width:1px; background:rgba(240,224,199,.14); pointer-events:none;}
   .tl-side-labels{display:flex; margin-bottom:4px; padding-left:32px;}
@@ -192,7 +197,7 @@
   .tl-band{position:absolute; left:0; right:0; pointer-events:none; border-top:1.5px solid rgba(240,224,199,.2);}
   .tl-band:first-child{border-top:none;}
   .tl-band.shaded{background:rgba(240,224,199,.035);}
-  .tl-band-label{position:absolute; top:3px; left:5px; font-size:8.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); opacity:.6; font-weight:600;}
+
   .tl-block{
     position:absolute; border-radius:5px; padding:4px 3px 4px 9px; font-size:9.5px; overflow:hidden;
     cursor:pointer; color:#17130f; box-shadow:0 1px 3px rgba(0,0,0,.35); border:1px solid rgba(0,0,0,.15);
@@ -923,11 +928,13 @@
       const todayStr = isoDate(new Date());
       const max = Math.max(...days.map(d => d.total), 1);
       const DOW_LETTERS = ['L','M','X','J','V','S','D'];
+      const CHART_H = 190; // debe coincidir con la altura de .cost-chart en CSS
 
       const bars = days.map(d => {
+        const barHeightPx = Math.max((d.total / max) * CHART_H, d.total > 0 ? 4 : 0);
         const segs = d.perEmp.filter(p => p.cost > 0).map(p => {
-          const segH = (p.cost / max) * 100;
-          const segPx = (segH / 100) * 190; // altura aprox. en px del contenedor del gráfico
+          const segH = d.total > 0 ? (p.cost / d.total) * 100 : 0;
+          const segPx = (segH / 100) * barHeightPx;
           const hoursTxt = p.hours.toFixed(1).replace(/\.0$/,'') + 'h';
           const costTxt = p.cost.toFixed(0) + '€';
           let inner = '';
@@ -943,7 +950,7 @@
         return `
           <div class="cost-bar-col ${isToday ? 'today' : ''}">
             <div class="cost-bar-value">${d.total > 0 ? d.total.toFixed(0) + '€' : ''}</div>
-            <div class="cost-bar stacked">${segs}</div>
+            <div class="cost-bar stacked" style="height:${barHeightPx}px">${segs}</div>
             <div class="cost-bar-label"><span class="cost-bar-dow">${dow}</span>${fmtDateShort(d.date)}</div>
           </div>`;
       }).join('');
@@ -973,17 +980,18 @@
       const todayStr = isoDate(new Date());
       const max = Math.max(...days.map(d => d.hours), 1);
       const DOW_LETTERS = ['L','M','X','J','V','S','D'];
+      const CHART_H_SINGLE = 190;
       const color = colorForEmployee(emp.id);
 
       const bars = days.map(d => {
-        const h = Math.max((d.hours / max) * 100, d.hours > 0 ? 2 : 0);
+        const h = Math.max((d.hours / max) * CHART_H_SINGLE, d.hours > 0 ? 4 : 0);
         const isToday = isoDate(d.date) === todayStr;
         const dow = DOW_LETTERS[(d.date.getDay() + 6) % 7];
         const topLabel = d.hours > 0 ? `${d.hours.toFixed(1).replace(/\.0$/,'')}h${d.cost !== null ? ' · ' + d.cost.toFixed(0) + '€' : ''}` : '';
         return `
           <div class="cost-bar-col ${isToday ? 'today' : ''}">
             <div class="cost-bar-value">${topLabel}</div>
-            <div class="cost-bar" style="height:${h}%; background:${color};"></div>
+            <div class="cost-bar" style="height:${h}px; background:${color};"></div>
             <div class="cost-bar-label"><span class="cost-bar-dow">${dow}</span>${fmtDateShort(d.date)}</div>
           </div>`;
       }).join('');
@@ -1155,7 +1163,12 @@
     const bandsHtml = bands.map(b => {
       const top = b.startMin * TL_PX_PER_MIN;
       const height = (b.endMin - b.startMin) * TL_PX_PER_MIN;
-      return `<div class="tl-band ${b.shade ? 'shaded' : ''}" style="top:${top}px; height:${height}px;">${b.label ? `<span class="tl-band-label">${b.label}</span>` : ''}</div>`;
+      return `<div class="tl-band ${b.shade ? 'shaded' : ''}" style="top:${top}px; height:${height}px;"></div>`;
+    }).join('');
+    const bandLabelsHtml = bands.filter(b => b.label).map(b => {
+      const top = b.startMin * TL_PX_PER_MIN;
+      const height = (b.endMin - b.startMin) * TL_PX_PER_MIN;
+      return `<span class="tl-band-vlabel" style="top:${top}px; height:${height}px;">${b.label}</span>`;
     }).join('');
 
     function blocksForType(layout, type, sideOffsetPct, sideWidthPct){
@@ -1188,7 +1201,7 @@
           <div class="day-head"><span class="day-name">${name}</span><span class="day-date">${fmtDate(dayDates[dayIdx])}</span></div>
           <div class="tl-side-labels"><span class="barra">Barra</span><span class="cocina">Cocina</span></div>
           <div class="timeline-wrap">
-            <div class="timeline-hours" style="height:${containerHeight}px">${hourLabelsHtml}</div>
+            <div class="timeline-hours" style="height:${containerHeight}px">${hourLabelsHtml}${bandLabelsHtml}</div>
             <div class="timeline-body" style="height:${containerHeight}px" data-add-turno="${dayIdx}">
               ${bandsHtml}
               ${gridlinesHtml}
